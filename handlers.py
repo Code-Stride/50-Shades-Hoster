@@ -52,6 +52,14 @@ pending_zip_files = state.pending_zip_files
 # Local primitive states
 bot_locked = False
 
+# Helper to create styled inline buttons utilizing Bot API 9.4 (danger, success, primary)
+def btn(text, callback_data=None, url=None, style=None):
+    button = types.InlineKeyboardButton(text, callback_data=callback_data, url=url)
+    if style:
+        button.style = style
+    return button
+
+
 # --- HELPER FUNCTIONS EXTRACTED FROM TEST.PY ---
 def is_user_member(user_id, channel_id):
     """Check if user is member of a channel"""
@@ -116,7 +124,7 @@ def create_subscription_check_message(not_joined_channels):
         message += f"• {channel_name}\n"
         markup.add(types.InlineKeyboardButton(f"Join {channel_name}", url=channel_link))
     
-    markup.add(types.InlineKeyboardButton("✅ Verify Subscription", callback_data='check_subscription_status'))
+    markup.add(btn("✅ Verify Subscription", callback_data='check_subscription_status', style='success'))
     
     return message, markup
 
@@ -209,27 +217,28 @@ def process_manual_install_module(message):
 def create_main_menu_inline(user_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
     buttons = [
-        types.InlineKeyboardButton('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}'),
-        types.InlineKeyboardButton('📤 Upload File', callback_data='upload'),
-        types.InlineKeyboardButton('📂 Check Files', callback_data='check_files'),
-        types.InlineKeyboardButton('⚡ Bot Speed', callback_data='speed'),
-        types.InlineKeyboardButton('📦 Manual Install', callback_data='manual_install'),
-        types.InlineKeyboardButton('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}')
+        btn('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}', style='primary'),
+        btn('📤 Upload File', callback_data='upload', style='success'),
+        btn('📂 Check Files', callback_data='check_files', style='primary'),
+        btn('⚡ Bot Speed', callback_data='speed'),
+        btn('📦 Manual Install', callback_data='manual_install'),
+        btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}')
     ]
 
     if user_id in admin_ids:
         admin_buttons = [
-            types.InlineKeyboardButton('💳 Subscriptions', callback_data='subscription'), #0
-            types.InlineKeyboardButton('📊 Statistics', callback_data='stats'), #1
-            types.InlineKeyboardButton('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot', #2
-                                     callback_data='lock_bot' if not bot_locked else 'unlock_bot'),
-            types.InlineKeyboardButton('📢 Broadcast', callback_data='broadcast'), #3
-            types.InlineKeyboardButton('👑 Admin Panel', callback_data='admin_panel'), #4
-            types.InlineKeyboardButton('🟢 Run All Scripts', callback_data='run_all_scripts'), #5
-            types.InlineKeyboardButton('📢 Channel Add', callback_data='manage_mandatory_channels'), #6
-            types.InlineKeyboardButton('👥 User Management', callback_data='user_management'), #7
-            types.InlineKeyboardButton('🛠️ Admin Install', callback_data='admin_install'), #8
-            types.InlineKeyboardButton('⚙️ Settings', callback_data='admin_settings') #9
+            btn('💳 Subscriptions', callback_data='subscription'), #0
+            btn('📊 Statistics', callback_data='stats'), #1
+            btn('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot', 
+                callback_data='lock_bot' if not bot_locked else 'unlock_bot',
+                style='danger' if not bot_locked else 'success'), #2
+            btn('📢 Broadcast', callback_data='broadcast', style='primary'), #3
+            btn('👑 Admin Panel', callback_data='admin_panel'), #4
+            btn('🟢 Run All Scripts', callback_data='run_all_scripts', style='success'), #5
+            btn('📢 Channel Add', callback_data='manage_mandatory_channels'), #6
+            btn('👥 User Management', callback_data='user_management'), #7
+            btn('🛠️ Admin Install', callback_data='admin_install'), #8
+            btn('⚙️ Settings', callback_data='admin_settings') #9
         ]
         markup.add(buttons[0]) # Updates
         markup.add(buttons[1], buttons[2]) # Upload, Check Files
@@ -244,7 +253,7 @@ def create_main_menu_inline(user_id):
         markup.add(buttons[0])
         markup.add(buttons[1], buttons[2])
         markup.add(buttons[3], buttons[4]) # Speed, Manual Install
-        markup.add(types.InlineKeyboardButton('📊 Statistics', callback_data='stats')) # Allow non-admins to see stats too
+        markup.add(btn('📊 Statistics', callback_data='stats')) # Allow non-admins to see stats too
         markup.add(buttons[5])
     return markup
 
@@ -259,59 +268,59 @@ def create_control_buttons(script_owner_id, file_name, is_running=True):
     markup = types.InlineKeyboardMarkup(row_width=2)
     if is_running:
         markup.row(
-            types.InlineKeyboardButton("🔴 Stop", callback_data=f'stop_{script_owner_id}_{file_name}'),
-            types.InlineKeyboardButton("🔄 Restart", callback_data=f'restart_{script_owner_id}_{file_name}')
+            btn("🔴 Stop", callback_data=f'stop_{script_owner_id}_{file_name}', style='danger'),
+            btn("🔄 Restart", callback_data=f'restart_{script_owner_id}_{file_name}', style='success')
         )
         markup.row(
-            types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}'),
-            types.InlineKeyboardButton("📜 Logs", callback_data=f'logs_{script_owner_id}_{file_name}')
+            btn("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}', style='danger'),
+            btn("📜 Logs", callback_data=f'logs_{script_owner_id}_{file_name}', style='primary')
         )
     else:
         markup.row(
-            types.InlineKeyboardButton("🟢 Start", callback_data=f'start_{script_owner_id}_{file_name}'),
-            types.InlineKeyboardButton("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}')
+            btn("🟢 Start", callback_data=f'start_{script_owner_id}_{file_name}', style='success'),
+            btn("🗑️ Delete", callback_data=f'delete_{script_owner_id}_{file_name}', style='danger')
         )
         markup.row(
-            types.InlineKeyboardButton("📜 View Logs", callback_data=f'logs_{script_owner_id}_{file_name}')
+            btn("📜 View Logs", callback_data=f'logs_{script_owner_id}_{file_name}', style='primary')
         )
-    markup.add(types.InlineKeyboardButton("🔙 Back to Files", callback_data='check_files'))
+    markup.add(btn("🔙 Back to Files", callback_data='check_files'))
     return markup
 
 def create_admin_panel():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('➕ Add Admin', callback_data='add_admin'),
-        types.InlineKeyboardButton('➖ Remove Admin', callback_data='remove_admin')
+        btn('➕ Add Admin', callback_data='add_admin', style='success'),
+        btn('➖ Remove Admin', callback_data='remove_admin', style='danger')
     )
-    markup.row(types.InlineKeyboardButton('📋 List Admins', callback_data='list_admins'))
-    markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('📋 List Admins', callback_data='list_admins'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
     return markup
 
 def create_user_management_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('🚫 Ban User', callback_data='ban_user'),
-        types.InlineKeyboardButton('✅ Unban User', callback_data='unban_user')
+        btn('🚫 Ban User', callback_data='ban_user', style='danger'),
+        btn('✅ Unban User', callback_data='unban_user', style='success')
     )
     markup.row(
-        types.InlineKeyboardButton('📊 User Info', callback_data='user_info'),
-        types.InlineKeyboardButton('👥 All Users', callback_data='all_users')
+        btn('📊 User Info', callback_data='user_info'),
+        btn('👥 All Users', callback_data='all_users')
     )
     markup.row(
-        types.InlineKeyboardButton('🔧 Set User Limit', callback_data='set_user_limit'),
-        types.InlineKeyboardButton('🗑️ Remove User Limit', callback_data='remove_user_limit')
+        btn('🔧 Set User Limit', callback_data='set_user_limit', style='primary'),
+        btn('🗑️ Remove User Limit', callback_data='remove_user_limit')
     )
-    markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
     return markup
 
 def create_subscription_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('➕ Add Subscription', callback_data='add_subscription'),
-        types.InlineKeyboardButton('➖ Remove Subscription', callback_data='remove_subscription')
+        btn('➕ Add Subscription', callback_data='add_subscription', style='success'),
+        btn('➖ Remove Subscription', callback_data='remove_subscription', style='danger')
     )
-    markup.row(types.InlineKeyboardButton('🔍 Check Subscription', callback_data='check_subscription'))
-    markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔍 Check Subscription', callback_data='check_subscription'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
     return markup
 
 def create_admin_settings_menu():
@@ -345,8 +354,8 @@ def handle_zip_file(downloaded_file_content, file_name_zip, message):
             security_warning_msg = f"🚨 File needs approval:\n👤 User: {user_id}\n📁 File: {file_name_zip}\n⚠️ Reason: {security_msg}"
             markup = types.InlineKeyboardMarkup()
             markup.row(
-                types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_zip_{user_id}_{file_name_zip}"),
-                types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_zip_{user_id}_{file_name_zip}")
+                btn("✅ Approve", callback_data=f"approve_zip_{user_id}_{file_name_zip}", style="success"),
+                btn("❌ Reject", callback_data=f"reject_zip_{user_id}_{file_name_zip}", style="danger")
             )
             for admin_id in admin_ids:
                 try:
@@ -1311,8 +1320,8 @@ def handle_file_upload_doc(message):
                 security_warning_msg = f"🚨 File needs approval:\n👤 User: {user_id}\n📁 File: {file_name}\n⚠️ Reason: {security_msg}"
                 markup = types.InlineKeyboardMarkup()
                 markup.row(
-                    types.InlineKeyboardButton("✅ Approve", callback_data=f"approve_file_{user_id}_{file_name}"),
-                    types.InlineKeyboardButton("❌ Reject", callback_data=f"reject_file_{user_id}_{file_name}")
+                    btn("✅ Approve", callback_data=f"approve_file_{user_id}_{file_name}", style="success"),
+                    btn("❌ Reject", callback_data=f"reject_file_{user_id}_{file_name}", style="danger")
                 )
                 for admin_id in admin_ids:
                     try:
@@ -1981,8 +1990,8 @@ def process_broadcast_message(message):
 
     target_count = len(active_users)
     markup = types.InlineKeyboardMarkup()
-    markup.row(types.InlineKeyboardButton("✅ Confirm & Send", callback_data=f"confirm_broadcast_{message.message_id}"),
-               types.InlineKeyboardButton("❌ Cancel", callback_data="cancel_broadcast"))
+    markup.row(btn("✅ Confirm & Send", callback_data=f"confirm_broadcast_{message.message_id}", style="success"),
+               btn("❌ Cancel", callback_data="cancel_broadcast", style="danger"))
 
     preview_text = broadcast_content[:1000].strip() if broadcast_content else "(Media message)"
     bot.reply_to(message, f"⚠️ Confirm Broadcast:\n\n```\n{preview_text}\n```\n" 
