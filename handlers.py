@@ -2693,12 +2693,8 @@ def cleanup_files_callback(call):
 def install_logs_callback(call):
     bot.answer_callback_query(call.id)
     try:
-        with DB_LOCK:
-            conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
-            c = conn.cursor()
-            c.execute('SELECT user_id, module_name, package_name, status, install_date FROM install_logs ORDER BY install_date DESC LIMIT 20')
-            logs = c.fetchall()
-            conn.close()
+        from database import get_recent_install_logs
+        logs = get_recent_install_logs(limit=20)
         
         if not logs:
             bot.edit_message_text("📋 **No installation logs found**", call.message.chat.id, 
