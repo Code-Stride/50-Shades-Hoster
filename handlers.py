@@ -262,7 +262,7 @@ def create_main_menu_inline(user_id):
         markup.add(buttons[0])
         markup.add(buttons[1], buttons[2])
         markup.add(buttons[3], buttons[4]) # Speed, Manual Install
-        markup.add(btn('📊 Statistics', callback_data='stats')) # Allow non-admins to see stats too
+        markup.add(btn('📊 Statistics', callback_data='stats', style='primary')) # Allow non-admins to see stats too
         markup.add(buttons[5])
     return markup
 
@@ -1547,7 +1547,7 @@ def check_files_callback(call):
         bot.answer_callback_query(call.id, "⚠️ No files uploaded.", show_alert=True)
         try:
             markup = types.InlineKeyboardMarkup()
-            markup.add(btn("🔙 Back to Main", callback_data='back_to_main'))
+            markup.add(btn("🔙 Back to Main", callback_data='back_to_main', style='primary'))
             bot.edit_message_text("📂 Your files:\n\n(No files uploaded)", chat_id, call.message.message_id, reply_markup=markup)
         except Exception as e: logger.error(f"Error editing msg for empty file list: {e}")
         return
@@ -1559,7 +1559,7 @@ def check_files_callback(call):
         btn_text = f"{file_name} ({file_type}) - {status_icon}"
         # Callback includes user_id as script_owner_id
         markup.add(btn(btn_text, callback_data=f'file_{user_id}_{file_name}', style='primary'))
-    markup.add(btn("🔙 Back to Main", callback_data='back_to_main'))
+    markup.add(btn("🔙 Back to Main", callback_data='back_to_main', style='primary'))
     try:
         bot.edit_message_text("📂 Your files:\nClick to manage.", chat_id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
     except telebot.apihelper.ApiTelegramException as e:
