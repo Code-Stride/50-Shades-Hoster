@@ -60,6 +60,14 @@ def btn(text, callback_data=None, url=None, style=None):
         button.style = style
     return button
 
+# Helper to create styled reply keyboard buttons utilizing Bot API 9.4 (danger, success, primary)
+def kb_btn(text, style=None):
+    button = types.KeyboardButton(text)
+    if style:
+        button.style = style
+    return button
+
+
 
 # --- HELPER FUNCTIONS EXTRACTED FROM TEST.PY ---
 def is_user_member(user_id, channel_id):
@@ -99,11 +107,11 @@ def create_mandatory_channels_menu():
     """Create mandatory channels management menu"""
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('➕ Add Channel', callback_data='add_mandatory_channel'),
-        types.InlineKeyboardButton('➖ Remove Channel', callback_data='remove_mandatory_channel')
+        btn('➕ Add Channel', callback_data='add_mandatory_channel', style='success'),
+        btn('➖ Remove Channel', callback_data='remove_mandatory_channel', style='danger')
     )
-    markup.row(types.InlineKeyboardButton('📋 List Channels', callback_data='list_mandatory_channels'))
-    markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('📋 List Channels', callback_data='list_mandatory_channels', style='primary'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
     return markup
 
 
@@ -123,7 +131,7 @@ def create_subscription_check_message(not_joined_channels):
             channel_link = f"https://t.me/c/{channel_id.replace('-100', '')}"
         
         message += f"• {channel_name}\n"
-        markup.add(types.InlineKeyboardButton(f"Join {channel_name}", url=channel_link))
+        markup.add(btn(f"Join {channel_name}", url=channel_link, style='primary'))
     
     markup.add(btn("✅ Verify Subscription", callback_data='check_subscription_status', style='success'))
     
@@ -260,9 +268,32 @@ def create_main_menu_inline(user_id):
 
 def create_reply_keyboard_main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    
+    # Map of custom reply keyboard button styles (Fixes Normal Button Styling)
+    button_styles = {
+        "📤 Upload File": "success",     # Green
+        "📂 Check Files": "primary",     # Blue
+        "⚡ Bot Speed": "primary",       # Blue
+        "📈 Bot Performance": "primary", # Blue
+        "🟢 Running All Code": "success",# Green
+        "🔒 Lock Bot": "danger",         # Red
+        "👑 Admin Panel": "danger",      # Red
+        "👥 User Management": "danger", # Red
+        "📢 Broadcast": "primary",       # Blue
+        "💳 Subscriptions": "primary",   # Blue
+        "📢 Channel Add": "success",     # Green
+        "🛠️ Manual Install": "success",   # Green
+        "🧹 Cleanup Files": "danger",    # Red
+        "⚙️ Settings": "primary",        # Blue
+    }
+    
     layout_to_use = ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC if user_id in admin_ids else COMMAND_BUTTONS_LAYOUT_USER_SPEC
     for row_buttons_text in layout_to_use:
-        markup.add(*[types.KeyboardButton(text) for text in row_buttons_text])
+        row_buttons = []
+        for text in row_buttons_text:
+            style = button_styles.get(text)
+            row_buttons.append(kb_btn(text, style=style))
+        markup.add(*row_buttons)
     return markup
 
 def create_control_buttons(script_owner_id, file_name, is_running=True):
@@ -327,14 +358,14 @@ def create_subscription_menu():
 def create_admin_settings_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.row(
-        types.InlineKeyboardButton('📊 System Info', callback_data='system_info'),
-        types.InlineKeyboardButton('📈 Bot Performance', callback_data='bot_performance')
+        btn('📊 System Info', callback_data='system_info', style='primary'),
+        btn('📈 Bot Performance', callback_data='bot_performance', style='primary')
     )
     markup.row(
-        types.InlineKeyboardButton('🧹 Cleanup Files', callback_data='cleanup_files'),
-        types.InlineKeyboardButton('📋 Installation Logs', callback_data='install_logs')
+        btn('🧹 Cleanup Files', callback_data='cleanup_files', style='danger'),
+        btn('📋 Installation Logs', callback_data='install_logs', style='primary')
     )
-    markup.row(types.InlineKeyboardButton('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
     return markup
 
 # --- File Handling ---
@@ -803,7 +834,7 @@ def _logic_send_welcome(message):
 
 def _logic_updates_channel(message):
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}'))
+    markup.add(btn('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}', style='primary'))
     bot.reply_to(message, "Visit our Updates Channel:", reply_markup=markup)
 
 def _logic_upload_file(message):
@@ -858,7 +889,7 @@ def _logic_check_files(message):
         status_icon = "🟢 Running" if is_running else "🔴 Stopped"
         btn_text = f"{file_name} ({file_type}) - {status_icon}"
         # Callback data includes user_id as script_owner_id
-        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{user_id}_{file_name}'))
+        markup.add(btn(btn_text, callback_data=f'file_{user_id}_{file_name}', style='primary'))
     bot.reply_to(message, "📂 Your files:\nClick to manage.", reply_markup=markup, parse_mode='Markdown')
 
 def _logic_bot_speed(message):
@@ -897,7 +928,7 @@ def _logic_bot_speed(message):
 
 def _logic_contact_owner(message):
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}'))
+    markup.add(btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}', style='primary'))
     bot.reply_to(message, "Click to contact Owner:", reply_markup=markup)
 
 def _logic_manual_install(message):
@@ -1506,7 +1537,7 @@ def check_files_callback(call):
         bot.answer_callback_query(call.id, "⚠️ No files uploaded.", show_alert=True)
         try:
             markup = types.InlineKeyboardMarkup()
-            markup.add(types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main'))
+            markup.add(btn("🔙 Back to Main", callback_data='back_to_main'))
             bot.edit_message_text("📂 Your files:\n\n(No files uploaded)", chat_id, call.message.message_id, reply_markup=markup)
         except Exception as e: logger.error(f"Error editing msg for empty file list: {e}")
         return
@@ -1517,8 +1548,8 @@ def check_files_callback(call):
         status_icon = "🟢 Running" if is_running else "🔴 Stopped"
         btn_text = f"{file_name} ({file_type}) - {status_icon}"
         # Callback includes user_id as script_owner_id
-        markup.add(types.InlineKeyboardButton(btn_text, callback_data=f'file_{user_id}_{file_name}'))
-    markup.add(types.InlineKeyboardButton("🔙 Back to Main", callback_data='back_to_main'))
+        markup.add(btn(btn_text, callback_data=f'file_{user_id}_{file_name}', style='primary'))
+    markup.add(btn("🔙 Back to Main", callback_data='back_to_main'))
     try:
         bot.edit_message_text("📂 Your files:\nClick to manage.", chat_id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
     except telebot.apihelper.ApiTelegramException as e:
@@ -2449,16 +2480,16 @@ def display_users_list(chat_id, message_id, users_list, page, total_pages, chunk
     if total_pages > 1:
         page_buttons = []
         if page > 0:
-            page_buttons.append(types.InlineKeyboardButton("⬅️ Previous", callback_data=f"users_page_{page-1}"))
+            page_buttons.append(btn("⬅️ Previous", callback_data=f"users_page_{page-1}", style='primary'))
         
-        page_buttons.append(types.InlineKeyboardButton(f"{page+1}/{total_pages}", callback_data="noop"))
+        page_buttons.append(btn(f"{page+1}/{total_pages}", callback_data="noop"))
         
         if page < total_pages - 1:
-            page_buttons.append(types.InlineKeyboardButton("Next ➡️", callback_data=f"users_page_{page+1}"))
+            page_buttons.append(btn("Next ➡️", callback_data=f"users_page_{page+1}", style='primary'))
         
         markup.row(*page_buttons)
     
-    markup.row(types.InlineKeyboardButton("🔙 Back to User Management", callback_data='user_management'))
+    markup.row(btn("🔙 Back to User Management", callback_data='user_management'))
     
     try:
         bot.edit_message_text(message_text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
@@ -2787,9 +2818,9 @@ def remove_mandatory_channel_callback(call):
     for channel_id, channel_info in mandatory_channels.items():
         channel_name = channel_info.get('name', 'Unknown')
         button_text = f"🗑️ {channel_name}"
-        markup.add(types.InlineKeyboardButton(button_text, callback_data=f'remove_channel_{channel_id}'))
+        markup.add(btn(button_text, callback_data=f'remove_channel_{channel_id}', style='danger'))
     
-    markup.add(types.InlineKeyboardButton("🔙 Back", callback_data='manage_mandatory_channels'))
+    markup.add(btn("🔙 Back", callback_data='manage_mandatory_channels'))
     
     try:
         bot.edit_message_text("📢 Choose channel to delete:",
