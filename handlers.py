@@ -1490,6 +1490,8 @@ def owner_required_callback(call, func_to_run):
 def manual_install_callback(call):
     user_id = call.from_user.id
     bot.answer_callback_query(call.id)
+    # Fix from_user so authorization check and next step handler wait for the actual user (Fixes Input Form bug)
+    call.message.from_user = call.from_user
     manual_install_module_init(call.message)
 
 def upload_callback(call):
@@ -1987,6 +1989,8 @@ def subscription_management_callback(call):
 
 def stats_callback(call): # Called by user and admin
     bot.answer_callback_query(call.id)
+    # Fix from_user so statistics accurately resolves the admin role (Fixes Stats Visibility bug)
+    call.message.from_user = call.from_user
     _logic_statistics(call.message) 
     try:
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
@@ -2143,6 +2147,8 @@ def admin_panel_callback(call):
 def add_admin_init_callback(call):
     bot.answer_callback_query(call.id)
     msg = bot.send_message(call.message.chat.id, "👑 Enter User ID to promote to Admin.\n/cancel to abort.")
+    # Fix from_user so next step handler waits for the actual user (Fixes Add Admin Input bug)
+    msg.from_user = call.from_user
     bot.register_next_step_handler(msg, process_add_admin_id)
 
 def process_add_admin_id(message):
@@ -2526,6 +2532,8 @@ def handle_users_page(call):
 def set_user_limit_callback(call):
     bot.answer_callback_query(call.id)
     msg = bot.send_message(call.message.chat.id, "🔧 Enter User ID and new limit (e.g., `12345678 50`)\n/cancel to cancel")
+    # Fix from_user so next step handler waits for the actual user
+    msg.from_user = call.from_user
     bot.register_next_step_handler(msg, process_set_user_limit)
 
 def process_set_user_limit(message):
@@ -2755,6 +2763,8 @@ def install_logs_callback(call):
 
 def admin_install_callback(call):
     bot.answer_callback_query(call.id)
+    # Fix from_user so authorization and next step handler work (Fixes Admin Install bug)
+    call.message.from_user = call.from_user
     _logic_admin_install(call.message)
 
 # --- Mandatory Channels Callbacks ---
