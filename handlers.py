@@ -111,7 +111,7 @@ def create_mandatory_channels_menu():
         btn('➖ Remove Channel', callback_data='remove_mandatory_channel', style='danger')
     )
     markup.row(btn('📋 List Channels', callback_data='list_mandatory_channels', style='primary'))
-    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main', style='primary'))
     return markup
 
 
@@ -229,25 +229,25 @@ def create_main_menu_inline(user_id):
         btn('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}', style='primary'),
         btn('📤 Upload File', callback_data='upload', style='success'),
         btn('📂 Check Files', callback_data='check_files', style='primary'),
-        btn('⚡ Bot Speed', callback_data='speed'),
-        btn('📦 Manual Install', callback_data='manual_install'),
-        btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}')
+        btn('⚡ Bot Speed', callback_data='speed', style='primary'),
+        btn('📦 Manual Install', callback_data='manual_install', style='success'),
+        btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}', style='primary')
     ]
 
     if user_id in admin_ids:
         admin_buttons = [
-            btn('💳 Subscriptions', callback_data='subscription'), #0
-            btn('📊 Statistics', callback_data='stats'), #1
+            btn('💳 Subscriptions', callback_data='subscription', style='primary'), #0
+            btn('📊 Statistics', callback_data='stats', style='primary'), #1
             btn('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot', 
                 callback_data='lock_bot' if not bot_locked else 'unlock_bot',
                 style='danger' if not bot_locked else 'success'), #2
             btn('📢 Broadcast', callback_data='broadcast', style='primary'), #3
-            btn('👑 Admin Panel', callback_data='admin_panel'), #4
+            btn('👑 Admin Panel', callback_data='admin_panel', style='danger'), #4
             btn('🟢 Run All Scripts', callback_data='run_all_scripts', style='success'), #5
-            btn('📢 Channel Add', callback_data='manage_mandatory_channels'), #6
-            btn('👥 User Management', callback_data='user_management'), #7
-            btn('🛠️ Admin Install', callback_data='admin_install'), #8
-            btn('⚙️ Settings', callback_data='admin_settings') #9
+            btn('📢 Channel Add', callback_data='manage_mandatory_channels', style='success'), #6
+            btn('👥 User Management', callback_data='user_management', style='danger'), #7
+            btn('🛠️ Admin Install', callback_data='admin_install', style='success'), #8
+            btn('⚙️ Settings', callback_data='admin_settings', style='primary') #9
         ]
         markup.add(buttons[0]) # Updates
         markup.add(buttons[1], buttons[2]) # Upload, Check Files
@@ -315,7 +315,7 @@ def create_control_buttons(script_owner_id, file_name, is_running=True):
         markup.row(
             btn("📜 View Logs", callback_data=f'logs_{script_owner_id}_{file_name}', style='primary')
         )
-    markup.add(btn("🔙 Back to Files", callback_data='check_files'))
+    markup.add(btn("🔙 Back to Files", callback_data='check_files', style='primary'))
     return markup
 
 def create_admin_panel():
@@ -324,8 +324,8 @@ def create_admin_panel():
         btn('➕ Add Admin', callback_data='add_admin', style='success'),
         btn('➖ Remove Admin', callback_data='remove_admin', style='danger')
     )
-    markup.row(btn('📋 List Admins', callback_data='list_admins'))
-    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('📋 List Admins', callback_data='list_admins', style='primary'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main', style='primary'))
     return markup
 
 def create_user_management_menu():
@@ -335,14 +335,14 @@ def create_user_management_menu():
         btn('✅ Unban User', callback_data='unban_user', style='success')
     )
     markup.row(
-        btn('📊 User Info', callback_data='user_info'),
-        btn('👥 All Users', callback_data='all_users')
+        btn('📊 User Info', callback_data='user_info', style='primary'),
+        btn('👥 All Users', callback_data='all_users', style='primary')
     )
     markup.row(
         btn('🔧 Set User Limit', callback_data='set_user_limit', style='primary'),
-        btn('🗑️ Remove User Limit', callback_data='remove_user_limit')
+        btn('🗑️ Remove User Limit', callback_data='remove_user_limit', style='danger')
     )
-    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main', style='primary'))
     return markup
 
 def create_subscription_menu():
@@ -351,8 +351,8 @@ def create_subscription_menu():
         btn('➕ Add Subscription', callback_data='add_subscription', style='success'),
         btn('➖ Remove Subscription', callback_data='remove_subscription', style='danger')
     )
-    markup.row(btn('🔍 Check Subscription', callback_data='check_subscription'))
-    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔍 Check Subscription', callback_data='check_subscription', style='primary'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main', style='primary'))
     return markup
 
 def create_admin_settings_menu():
@@ -365,7 +365,7 @@ def create_admin_settings_menu():
         btn('🧹 Cleanup Files', callback_data='cleanup_files', style='danger'),
         btn('📋 Installation Logs', callback_data='install_logs', style='primary')
     )
-    markup.row(btn('🔙 Back to Main', callback_data='back_to_main'))
+    markup.row(btn('🔙 Back to Main', callback_data='back_to_main', style='primary'))
     return markup
 
 # --- File Handling ---
@@ -1408,6 +1408,8 @@ def handle_callbacks(call):
     try:
         if data == 'upload': upload_callback(call)
         elif data == 'check_files': check_files_callback(call)
+        elif data.startswith('users_page_'): admin_required_callback(call, handle_users_page)
+        elif data == 'noop': bot.answer_callback_query(call.id); return
         elif data.startswith('file_'): file_control_callback(call)
         elif data.startswith('start_'): start_bot_callback(call)
         elif data.startswith('stop_'): stop_bot_callback(call)
@@ -1462,6 +1464,12 @@ def handle_callbacks(call):
             bot.answer_callback_query(call.id, "Unknown action.")
             logger.warning(f"Unhandled callback data: {data} from user {user_id}")
     except Exception as e:
+        # Catch and silently ignore harmless "message is not modified" errors to prevent popups
+        if "message is not modified" in str(e).lower():
+            logger.info(f"Ignored harmless 'message is not modified' error for user {user_id}")
+            try: bot.answer_callback_query(call.id)
+            except: pass
+            return
         logger.error(f"Error handling callback '{data}' for {user_id}: {e}", exc_info=True)
         try: bot.answer_callback_query(call.id, "Error processing request.", show_alert=True)
         except Exception as e_ans: logger.error(f"Failed to answer callback after error: {e_ans}")
@@ -2482,14 +2490,14 @@ def display_users_list(chat_id, message_id, users_list, page, total_pages, chunk
         if page > 0:
             page_buttons.append(btn("⬅️ Previous", callback_data=f"users_page_{page-1}", style='primary'))
         
-        page_buttons.append(btn(f"{page+1}/{total_pages}", callback_data="noop"))
+        page_buttons.append(btn(f"{page+1}/{total_pages}", callback_data="noop", style='primary'))
         
         if page < total_pages - 1:
             page_buttons.append(btn("Next ➡️", callback_data=f"users_page_{page+1}", style='primary'))
         
         markup.row(*page_buttons)
     
-    markup.row(btn("🔙 Back to User Management", callback_data='user_management'))
+    markup.row(btn("🔙 Back to User Management", callback_data='user_management', style='primary'))
     
     try:
         bot.edit_message_text(message_text, chat_id, message_id, reply_markup=markup, parse_mode='Markdown')
@@ -2820,7 +2828,7 @@ def remove_mandatory_channel_callback(call):
         button_text = f"🗑️ {channel_name}"
         markup.add(btn(button_text, callback_data=f'remove_channel_{channel_id}', style='danger'))
     
-    markup.add(btn("🔙 Back", callback_data='manage_mandatory_channels'))
+    markup.add(btn("🔙 Back", callback_data='manage_mandatory_channels', style='primary'))
     
     try:
         bot.edit_message_text("📢 Choose channel to delete:",
