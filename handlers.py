@@ -945,38 +945,31 @@ def _logic_manual_install(message):
         bot.reply_to(message, "⚠️ **Manual Installation Restricted**:\n\nFor server safety, manual pip/npm installations can only be initiated by Admins. If you need any packages installed, please contact the **Owner**.", parse_mode='Markdown')
 
 def _logic_help(message):
-    help_text = """
-🤖 **BLAZE NXT Hosting Bot Help Guide**
+    help_text = f"""
+🎭 **50 Shades Hoster - Help Guide**
 
-**📌 Basic Commands:**
-• /start - Start the bot
-• /help - Show this help message
-• /status - Show bot statistics
+Welcome to the most secure, completely anonymous, and isolated hosting environment for your Python (`.py`) and JavaScript (`.js`) scripts!
 
-**📁 File Management:**
-• Upload `.py` or `.js` files directly
-• Upload `.zip` archives with multiple files
-• Auto-installs dependencies from `requirements.txt` or `package.json`
+⚙️ **How It Works:**
+1️⃣ **Upload your script**: Simply send your `.py`, `.js` file, or a `.zip` archive containing your bot.
+2️⃣ **Automatic Sandbox**: Your files are instantly stored in an anonymous, hashed directory for complete isolation.
+3️⃣ **Auto Dependency Installer**: If your script needs packages, the bot detects imports and installs them. If you upload a `.zip`, it auto-installs packages listed inside `requirements.txt` or `package.json`!
+4️⃣ **Control Panel**: Once uploaded, click **📂 My Scripts** to start, stop, restart, delete, or view the real-time runtime logs of your bots!
 
-**📦 Module Installation:**
-• Auto-install missing Python/Node modules
-• Manual install via "📦 Manual Install" button
-• Admin can install modules for users
+🛡️ **Harden Sandbox Security:**
+• Standard directory traversal and absolute path traversal attempts are strictly scanned and blocked.
+• Manual pip/npm installations are restricted to Admins only. Place your packages inside a `requirements.txt` or `package.json` file inside your `.zip` archive for automated installs!
 
-**👑 Admin Features:**
-• User management (ban/unban)
-• Set custom file limits
-• Manage mandatory channels
-• Broadcast messages
-• Run all user scripts
+📌 **Basic Commands:**
+• /start - Start or restart the bot interface.
+• /help - View this help guide.
 
-**⚙️ Tips:**
-1. Make sure your scripts don't contain dangerous commands
-2. Join all required channels
-3. Contact owner for subscription upgrades
+👤 **Your Identity is 100% Protected:**
+• Hashed directory isolation on-disk.
+• No Telegram name, username, or raw ID is logged or shown.
+• 100% zero-tracking.
 
-**Support:** @FIRSTOGET
-**Updates:** @BKSNUMBERZONE
+📢 **Updates Channel**: {UPDATE_CHANNEL}
 """
     bot.reply_to(message, help_text, parse_mode='Markdown')
 
