@@ -424,28 +424,13 @@ def handle_zip_file(downloaded_file_content, file_name_zip, message):
         zip_path = os.path.join(temp_dir, file_name_zip)
         with open(zip_path, 'wb') as new_file: new_file.write(downloaded_file_content)
         
-        # Security check for ZIP
+        # Security check for ZIP (Approval System Completely Removed - Auto-Reject and Delete)
         is_safe, security_msg = scan_zip_security(zip_path)
         if not is_safe:
-            # Send security warning to admin for approval
-            security_warning_msg = f"🚨 File needs approval:\n👤 User: {user_id}\n📁 File: {file_name_zip}\n⚠️ Reason: {security_msg}"
-            markup = types.InlineKeyboardMarkup()
-            markup.row(
-                btn("✅ Approve", callback_data=f"approve_zip_{user_id}_{file_name_zip}", style="success"),
-                btn("❌ Reject", callback_data=f"reject_zip_{user_id}_{file_name_zip}", style="danger")
-            )
-            for admin_id in admin_ids:
-                try:
-                    bot.send_message(admin_id, security_warning_msg, reply_markup=markup)
-                except Exception as e:
-                    logger.error(f"Failed to send security warning to admin {admin_id}: {e}")
-            
-            # Store the file content for later approval
-            if user_id not in pending_zip_files:
-                pending_zip_files[user_id] = {}
-            pending_zip_files[user_id][file_name_zip] = downloaded_file_content
-            
-            bot.reply_to(message, f"⏳ File under security review. You will be notified upon approval.")
+            if os.path.exists(zip_path):
+                try: os.remove(zip_path)
+                except: pass
+            bot.reply_to(message, f"❌ **Upload Rejected**:\n\nYour archive `{file_name_zip}` failed our security scans and was deleted immediately for server safety.\n\n⚠️ **Reason**: {security_msg}", parse_mode='Markdown')
             return
 
         # Process ZIP file if safe
@@ -1012,23 +997,13 @@ def handle_file_upload_doc(message):
             with open(file_path, 'wb') as f: f.write(downloaded_file_content)
             logger.info(f"Saved single file to {file_path}")
             
-            # Security check for script files (lightweight)
+            # Security check for script files (Approval System Completely Removed - Auto-Reject and Delete)
             is_safe, security_msg = check_code_security(file_path, file_ext[1:])
             if not is_safe:
-                # Send security warning to admin for approval
-                security_warning_msg = f"🚨 File needs approval:\n👤 User: {user_id}\n📁 File: {file_name}\n⚠️ Reason: {security_msg}"
-                markup = types.InlineKeyboardMarkup()
-                markup.row(
-                    btn("✅ Approve", callback_data=f"approve_file_{user_id}_{file_name}", style="success"),
-                    btn("❌ Reject", callback_data=f"reject_file_{user_id}_{file_name}", style="danger")
-                )
-                for admin_id in admin_ids:
-                    try:
-                        bot.send_message(admin_id, security_warning_msg, reply_markup=markup)
-                    except Exception as e:
-                        logger.error(f"Failed to send security warning to admin {admin_id}: {e}")
-                
-                bot.reply_to(message, f"⏳ File under security review. You will be notified upon approval.")
+                if os.path.exists(file_path):
+                    try: os.remove(file_path)
+                    except: pass
+                bot.reply_to(message, f"❌ **Upload Rejected**:\n\nYour file `{file_name}` failed our security scans and was deleted immediately for server safety.\n\n⚠️ **Reason**: {security_msg}", parse_mode='Markdown')
                 return
                 
             # Pass user_id as script_owner_id

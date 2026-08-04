@@ -16,6 +16,65 @@ from database import save_install_log, remove_user_file_db, save_user_file
 
 logger = logging.getLogger(__name__)
 
+import ast
+
+# Standard Python library modules to ignore (Fixes Static Package Auto-Installer)
+STD_LIB_MODULES = {
+    'sys', 'os', 'time', 'datetime', 'math', 're', 'json', 'subprocess',
+    'threading', 'logging', 'hashlib', 'shutil', 'tempfile', 'zipfile',
+    'socket', 'sqlite3', 'ast', 'select', 'signal', 'urllib', 'collections',
+    'random', 'uuid', 'functools', 'itertools', 'traceback', 'io', 'base64',
+    'platform', 'weakref', 'gc', 'atexit', 'ctypes', 'inspect', 'pickle', 'csv',
+    'asyncio', 'abc', 'typing', 'string', 'glob', 'pathlib'
+}
+
+# Core Node.js modules to ignore (Fixes Static Node Auto-Installer)
+JS_CORE_MODULES = {
+    'path', 'fs', 'crypto', 'os', 'http', 'https', 'child_process',
+    'querystring', 'url', 'util', 'events', 'stream', 'readline', 'process'
+}
+
+def extract_imports(file_path):
+    """Statically parse a Python file to extract all imported module names"""
+    imports = set()
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            tree = ast.parse(f.read(), filename=file_path)
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports.add(alias.name.split('.')[0])
+            elif isinstance(node, ast.ImportFrom):
+                if node.level == 0 and node.module: # Only absolute imports
+                    imports.add(node.module.split('.')[0])
+    except Exception as e:
+        logger.error(f"Error parsing imports from {file_path}: {e}")
+    return imports
+
+def extract_js_imports(file_path):
+    """Scan a JS file using regex to extract imported package names"""
+    imports = set()
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            code = f.read()
+            
+        # Match require('package')
+        req_matches = re.findall(r"require\s*\(\s*['\x22](.+?)['\x22]\s*\)", code)
+        for m in req_matches:
+            if not m.startswith('.') and not m.startswith('/'):
+                imports.add(m.split('/')[0])
+                
+        # Match import ... from 'package'
+        imp_matches = re.findall(r"from\s*['\x22](.+?)['\x22]", code)
+        for m in imp_matches:
+            if not m.startswith('.') and not m.startswith('/'):
+                imports.add(m.split('/')[0])
+    except Exception as e:
+        logger.error(f"Error scanning JS imports: {e}")
+    return imports
+
+
 # --- Map Telegram import names to actual PyPI package names ---
 TELEGRAM_MODULES = {
     'telebot': 'pyTelegramBotAPI',
@@ -242,6 +301,18 @@ def run_script(script_path, script_owner_id, user_folder, file_name, reply_targe
              remove_user_file_db(script_owner_id, file_name)
              return
 
+        # Auto-install missing Python dependencies statically (Fixes No requirements.txt Dependency Fallback)
+        try:
+            logger.info(f"Statically scanning {file_name} for Python dependencies...")
+            detected_deps = extract_imports(script_path)
+            non_core_deps = [d for d in detected_deps if d not in STD_LIB_MODULES]
+            if non_core_deps:
+                logger.info(f"Found non-core Python dependencies to verify: {non_core_deps}")
+                for dep in non_core_deps:
+                    attempt_install_pip(dep, target_chat_id)
+        except Exception as scan_e:
+            logger.error(f"Error statically auto-installing Python deps: {scan_e}")
+
         if attempt == 1:
             check_command = [sys.executable, script_path]
             logger.info(f"Running Python pre-check: {' '.join(check_command)}")
@@ -358,6 +429,18 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, reply_ta
                  state.user_files[script_owner_id] = [f for f in state.user_files.get(script_owner_id, []) if f[0] != file_name]
              remove_user_file_db(script_owner_id, file_name)
              return
+
+        # Auto-install missing JS dependencies statically (Fixes No package.json Dependency Fallback)
+        try:
+            logger.info(f"Statically scanning {file_name} for Node.js dependencies...")
+            detected_deps = extract_js_imports(script_path)
+            non_core_deps = [d for d in detected_deps if d not in JS_CORE_MODULES]
+            if non_core_deps:
+                logger.info(f"Found non-core Node.js dependencies to verify: {non_core_deps}")
+                for dep in non_core_deps:
+                    attempt_install_npm(dep, user_folder, target_chat_id)
+        except Exception as scan_e:
+            logger.error(f"Error statically auto-installing JS deps: {scan_e}")
 
         if attempt == 1:
             check_command = ['node', script_path]
