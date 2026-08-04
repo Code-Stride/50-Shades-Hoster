@@ -77,6 +77,13 @@ def cancel_markup():
 
 
 # --- HELPER FUNCTIONS EXTRACTED FROM TEST.PY ---
+
+# Helper to create styled visual progress bars for CPU/RAM/Disk metrics (Feature 3)
+def make_progress_bar(percent):
+    filled = int(percent / 10)
+    bar = "█" * filled + "░" * (10 - filled)
+    return f"`[{bar}] {percent}%`"
+
 def is_user_member(user_id, channel_id):
     """Check if user is member of a channel"""
     try:
@@ -96,7 +103,9 @@ def is_user_member(user_id, channel_id):
 
 
 def check_mandatory_subscription(user_id):
-    """Check if user is subscribed to all mandatory channels"""
+    """Check if user is subscribed to all mandatory channels (Bypassed if bot is in FREE mode)"""
+    if state.free_mode:
+        return True, []
     if not mandatory_channels:
         return True, []  # No mandatory channels exist
     
@@ -166,7 +175,9 @@ def get_user_folder(user_id):
 
 
 def get_user_file_limit(user_id):
-    """Get the file upload limit for a user"""
+    """Get the file upload limit for a user (Bypassed if bot is in FREE mode)"""
+    if state.free_mode:
+        return OWNER_LIMIT
     if user_id == OWNER_ID: return OWNER_LIMIT
     if user_id in admin_ids: return ADMIN_LIMIT
     if user_id in user_limits: return user_limits[user_id]
@@ -305,6 +316,13 @@ def create_reply_keyboard_main_menu(user_id):
 
 def create_control_buttons(script_owner_id, file_name, is_running=True):
     markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Get current auto-restart toggle state from memory cache (Feature 2)
+    auto_restart = state.script_auto_restart.get(f"{script_owner_id}_{file_name}", False)
+    btn_auto = btn("🔄 Auto-Restart: ON" if auto_restart else "🔄 Auto-Restart: OFF",
+                   callback_data=f"toggle_autorestart_{script_owner_id}_{file_name}",
+                   style="success" if auto_restart else "danger")
+    
     if is_running:
         markup.row(
             btn("🔴 Stop", callback_data=f'stop_{script_owner_id}_{file_name}', style='danger'),
@@ -322,6 +340,14 @@ def create_control_buttons(script_owner_id, file_name, is_running=True):
         markup.row(
             btn("📜 View Logs", callback_data=f'logs_{script_owner_id}_{file_name}', style='primary')
         )
+        
+    # Auto-Restart & Extra Utilities Row (Feature 2, 4, 5)
+    markup.row(btn_auto)
+    markup.row(
+        btn("📂 File Explorer", callback_data=f"explorer_{script_owner_id}", style="primary"),
+        btn("💾 Get Backup (.zip)", callback_data=f"backup_{script_owner_id}", style="success")
+    )
+    
     markup.add(btn("🔙 Back to Files", callback_data='check_files', style='primary'))
     return markup
 
@@ -364,6 +390,13 @@ def create_subscription_menu():
 
 def create_admin_settings_menu():
     markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Persistent Free/Premium Mode Toggle for Public Launcher (Admin Toggle)
+    btn_mode = btn("🔄 Bot Mode: FREE (All Unlocked)" if state.free_mode else "🔄 Bot Mode: PREMIUM (Subs Active)",
+                   callback_data="toggle_free_mode",
+                   style="success" if state.free_mode else "danger")
+                   
+    markup.row(btn_mode)
     markup.row(
         btn('📊 System Info', callback_data='system_info', style='primary'),
         btn('📈 Bot Performance', callback_data='bot_performance', style='primary')
@@ -372,6 +405,10 @@ def create_admin_settings_menu():
         btn('🧹 Cleanup Files', callback_data='cleanup_files', style='danger'),
         btn('📋 Installation Logs', callback_data='install_logs', style='primary')
     )
+    
+    # Key Generator Button for Monetization License Keys (Feature 1)
+    markup.row(btn("🔑 Generate License Key", callback_data="admin_genkey", style="success"))
+    
     markup.row(btn('🔙 Back to Main', callback_data='back_to_main', style='primary'))
     return markup
 
@@ -921,7 +958,7 @@ def _logic_bot_speed(message):
         return
         
     start_time_ping = time.time()
-    wait_msg = bot.reply_to(message, "🏃 Testing speed...")
+    wait_msg = bot.reply_to(message, "🏃 Testing speed and compiling resource info...")
     try:
         bot.send_chat_action(chat_id, 'typing')
         response_time = round((time.time() - start_time_ping) * 1000, 2)
@@ -930,10 +967,24 @@ def _logic_bot_speed(message):
         elif user_id in admin_ids: user_level = "🛡️ Admin"
         elif user_id in user_subscriptions and user_subscriptions[user_id].get('expiry', datetime.min) > datetime.now(): user_level = "⭐ Premium"
         else: user_level = "🆓 Free User"
-        speed_msg = (f"⚡ Bot Speed & Status:\n\n⏱️ API Response Time: {response_time} ms\n"
-                     f"🚦 Bot Status: {status}\n"
-                     f"👤 Your Level: {user_level}")
-        bot.edit_message_text(speed_msg, chat_id, wait_msg.message_id)
+        
+        # Calculate live system metrics with progress bars (Feature 3)
+        cpu_p = psutil.cpu_percent()
+        ram_p = psutil.virtual_memory().percent
+        disk_p = psutil.disk_usage('/').percent
+        
+        cpu_bar = make_progress_bar(cpu_p)
+        ram_bar = make_progress_bar(ram_p)
+        disk_bar = make_progress_bar(disk_p)
+        
+        speed_msg = (f"⚡ **System Monitor & Health Info**:\n\n"
+                     f"⏱️ **Ping Response**: `{response_time} ms`\n"
+                     f"🚦 **Bot Status**: {status}\n"
+                     f"👤 **Your Account**: {user_level}\n\n"
+                     f"💻 **CPU Usage**:\n{cpu_bar}\n"
+                     f"🧠 **RAM Usage**:\n{ram_bar}\n"
+                     f"💾 **Disk Storage**:\n{disk_bar}")
+        bot.edit_message_text(speed_msg, chat_id, wait_msg.message_id, parse_mode='Markdown')
     except Exception as e:
         logger.error(f"Error during speed test (cmd): {e}", exc_info=True)
         bot.edit_message_text("❌ Error during speed test.", chat_id, wait_msg.message_id)
@@ -1357,6 +1408,60 @@ def handle_callbacks(call):
             except Exception as e: logger.error(f"Error clearing step handler: {e}")
             bot.answer_callback_query(call.id, "❌ Action cancelled!")
             back_to_main_callback(call)
+            return
+        elif data.startswith('toggle_autorestart_'):
+            try:
+                data_parts = data.split('_')
+                script_owner_id = int(data_parts[2])
+                file_name = '_'.join(data_parts[3:])
+                script_key = f"{script_owner_id}_{file_name}"
+                current_state = state.script_auto_restart.get(script_key, False)
+                new_state = not current_state
+                from database import save_script_auto_restart
+                save_script_auto_restart(script_owner_id, file_name, new_state)
+                bot.answer_callback_query(call.id, f"🔄 Auto-Restart: {'ON' if new_state else 'OFF'}")
+                is_running = is_bot_running(script_owner_id, file_name)
+                bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+                                              reply_markup=create_control_buttons(script_owner_id, file_name, is_running))
+            except Exception as e:
+                logger.error(f"Error toggling auto-restart: {e}", exc_info=True)
+                bot.answer_callback_query(call.id, "Error toggling auto-restart.", show_alert=True)
+            return
+        elif data == 'toggle_free_mode':
+            if call.from_user.id not in admin_ids:
+                bot.answer_callback_query(call.id, "⚠️ Admin only.", show_alert=True)
+                return
+            try:
+                state.free_mode = not state.free_mode
+                from database import save_bot_setting
+                save_bot_setting('free_mode', state.free_mode)
+                bot.answer_callback_query(call.id, f"🔄 Bot Mode: {'FREE' if state.free_mode else 'PREMIUM'}")
+                bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+                                              reply_markup=create_admin_settings_menu())
+            except Exception as e:
+                logger.error(f"Error toggling free mode: {e}", exc_info=True)
+                bot.answer_callback_query(call.id, "Error toggling free mode.", show_alert=True)
+            return
+        elif data == 'admin_genkey':
+            if call.from_user.id not in admin_ids:
+                bot.answer_callback_query(call.id, "⚠️ Admin only.", show_alert=True)
+                return
+            bot.answer_callback_query(call.id)
+            msg = bot.send_message(call.message.chat.id, "🔑 **License Key Generator**:\n\nEnter the number of subscription Days for the new key (e.g. `30` or `365`):\n\n/cancel to abort.", reply_markup=cancel_markup(), parse_mode='Markdown')
+            msg.from_user = call.from_user
+            bot.register_next_step_handler(msg, process_generate_key)
+            return
+        elif data.startswith('explorer_'):
+            explorer_callback(call)
+            return
+        elif data.startswith('expfile_'):
+            explore_file_callback(call)
+            return
+        elif data.startswith('expdel_'):
+            delete_file_explorer_callback(call)
+            return
+        elif data.startswith('backup_'):
+            backup_callback(call)
             return
         elif data.startswith('file_'): file_control_callback(call)
         elif data.startswith('start_'): start_bot_callback(call)
@@ -3009,3 +3114,225 @@ def process_reject_zip(call):
         logger.error(f"Failed to notify user {user_id}: {e}")
 
 # --- Cleanup Function ---
+
+
+# =====================================================================
+# 🚀 PREMIUM FEATURES & CORE ALGORITHMS FOR PUBLIC PRODUCTION LAUNCH
+# =====================================================================
+
+# --- Feature 1: License Key Generator & Redeemer ---
+
+@bot.message_handler(commands=['generatekey'])
+def command_generate_key(message):
+    """Generate a premium redeemable subscription key (Admin only)"""
+    user_id = message.from_user.id
+    if user_id not in admin_ids:
+        bot.reply_to(message, "⚠️ Admin permissions required.")
+        return
+        
+    parts = message.text.split()
+    if len(parts) < 2:
+        bot.reply_to(message, "⚠️ Format: `/generatekey <days>`\nExample: `/generatekey 30`", parse_mode='Markdown')
+        return
+        
+    try:
+        days = int(parts[1])
+        if days <= 0: raise ValueError()
+        
+        # Generate secure key format: PREM-XXXX-XXXX-XXXX
+        import secrets
+        key_chars = secrets.token_hex(6).upper()
+        license_key = f"PREM-{key_chars[:4]}-{key_chars[4:8]}-{key_chars[8:]}"
+        
+        from database import generate_license_key_db
+        if generate_license_key_db(license_key, days, user_id):
+            bot.reply_to(message, f"🔑 **License Key Generated Successfully**:\n\n`{license_key}`\n\n📅 **Duration**: `{days} Days`\n📦 Use `/redeem {license_key}` to activate.", parse_mode='Markdown')
+        else:
+            bot.reply_to(message, "❌ Failed to store generated license key in database.")
+    except ValueError:
+        bot.reply_to(message, "⚠️ Days must be a valid positive integer.")
+
+def process_generate_key(message):
+    """Process license key generator prompt"""
+    if message.from_user.id not in admin_ids:
+        bot.reply_to(message, "⚠️ Not authorized.")
+        return
+    if message.text.lower() == '/cancel':
+        bot.reply_to(message, "❌ Cancelled.")
+        return
+    try:
+        days = int(message.text.strip())
+        if days <= 0: raise ValueError()
+        
+        import secrets
+        key_chars = secrets.token_hex(6).upper()
+        license_key = f"PREM-{key_chars[:4]}-{key_chars[4:8]}-{key_chars[8:]}"
+        
+        from database import generate_license_key_db
+        if generate_license_key_db(license_key, days, message.from_user.id):
+            bot.reply_to(message, f"🔑 **License Key Generated**:\n\n`{license_key}`\n\n📅 **Duration**: `{days} Days`\n📦 Use `/redeem {license_key}` to activate.", parse_mode='Markdown')
+        else:
+            bot.reply_to(message, "❌ Failed to save key.")
+    except ValueError:
+        bot.reply_to(message, "⚠️ Days must be a positive integer. Process cancelled.")
+
+@bot.message_handler(commands=['redeem'])
+def command_redeem_key(message):
+    """Redeem a license key to extend premium subscription"""
+    user_id = message.from_user.id
+    parts = message.text.split()
+    if len(parts) < 2:
+        bot.reply_to(message, "⚠️ Format: `/redeem PREM-XXXX-XXXX-XXXX`\nExample: `/redeem PREM-A1B2-C3D4-E5F6`", parse_mode='Markdown')
+        return
+        
+    license_key = parts[1].strip()
+    from database import check_and_redeem_license_key_db
+    success, resp_msg = check_and_redeem_license_key_db(license_key, user_id)
+    bot.reply_to(message, resp_msg, parse_mode='Markdown')
+
+def process_redeem_key(message):
+    """Process license key redemption prompt"""
+    if message.text.lower() == '/cancel':
+        bot.reply_to(message, "❌ Aborted.")
+        return
+    license_key = message.text.strip()
+    from database import check_and_redeem_license_key_db
+    success, resp_msg = check_and_redeem_license_key_db(license_key, message.from_user.id)
+    bot.reply_to(message, resp_msg, parse_mode='Markdown')
+
+
+# --- Feature 4 & 5: Hashed File Explorer & Dynamic Backups ---
+
+def explorer_callback(call):
+    """List files inside the hashed user sandbox folder"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_')
+        script_owner_id = int(data_parts[1])
+        requesting_user_id = call.from_user.id
+        
+        if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
+            bot.send_message(call.message.chat.id, "⚠️ Permission denied.")
+            return
+            
+        user_folder = get_user_folder(script_owner_id)
+        files = os.listdir(user_folder)
+        
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for f in sorted(files):
+            # Don't show system hidden files
+            if f.startswith('.') or f.endswith('.log'): continue
+            file_size_kb = round(os.path.getsize(os.path.join(user_folder, f)) / 1024, 2)
+            markup.add(btn(f"📄 {f} ({file_size_kb} KB)", callback_data=f"expfile_{script_owner_id}_{f}", style='primary'))
+            
+        markup.add(btn("🔙 Back to Controls", callback_data='check_files', style='primary'))
+        
+        bot.edit_message_text(f"📂 **Sandbox Explorer**: `{script_owner_id}`\n\nSelect any file to read details or delete:", 
+                              call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in explorer_callback: {e}", exc_info=True)
+
+def explore_file_callback(call):
+    """Display individual file information"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_', 2)
+        script_owner_id = int(data_parts[1])
+        file_name = data_parts[2]
+        requesting_user_id = call.from_user.id
+        
+        if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
+            bot.send_message(call.message.chat.id, "⚠️ Permission denied.")
+            return
+            
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        
+        if not os.path.exists(file_path):
+            bot.send_message(call.message.chat.id, "❌ File not found on disk.")
+            return
+            
+        size = round(os.path.getsize(file_path) / 1024, 2)
+        mtime = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.row(
+            btn("🗑️ Delete File", callback_data=f"expdel_{script_owner_id}_{file_name}", style='danger'),
+            btn("🔙 Back to Explorer", callback_data=f"explorer_{script_owner_id}", style='primary')
+        )
+        
+        file_info_text = f"📄 **File Explorer**: `{file_name}`\n\n📏 **Size**: `{size} KB`\n📅 **Last Modified**: `{mtime}`"
+        bot.edit_message_text(file_info_text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in explore_file_callback: {e}", exc_info=True)
+
+def delete_file_explorer_callback(call):
+    """Delete an individual file inside the folder"""
+    try:
+        data_parts = call.data.split('_', 2)
+        script_owner_id = int(data_parts[1])
+        file_name = data_parts[2]
+        requesting_user_id = call.from_user.id
+        
+        if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
+            bot.answer_callback_query(call.id, "⚠️ Permission denied.", show_alert=True)
+            return
+            
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            bot.answer_callback_query(call.id, "✅ File deleted successfully!", show_alert=True)
+            
+            # If main script record is deleted, remove it from DB too
+            user_files_list = user_files.get(script_owner_id, [])
+            if any(f[0] == file_name for f in user_files_list):
+                remove_user_file_db(script_owner_id, file_name)
+                
+            explorer_callback(call)
+        else:
+            bot.answer_callback_query(call.id, "❌ File not found.", show_alert=True)
+    except Exception as e:
+        logger.error(f"Error in delete_file_explorer_callback: {e}", exc_info=True)
+
+def backup_callback(call):
+    """Compress user sandbox directory and send as .zip document"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_')
+        script_owner_id = int(data_parts[1])
+        requesting_user_id = call.from_user.id
+        
+        if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
+            bot.send_message(call.message.chat.id, "⚠️ Permission denied.")
+            return
+            
+        user_folder = get_user_folder(script_owner_id)
+        
+        bot.send_message(call.message.chat.id, "⏳ **Generating Sandbox Backup**... Please wait.")
+        
+        # Create a zip archive in temp directory
+        temp_zip_dir = tempfile.mkdtemp(prefix=f"backup_user_{script_owner_id}_")
+        zip_file_name = f"backup_{script_owner_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        zip_path = os.path.join(temp_zip_dir, zip_file_name)
+        
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_f:
+            for root, dirs, files in os.walk(user_folder):
+                for f in files:
+                    file_abs = os.path.join(root, f)
+                    file_rel = os.path.relpath(file_abs, user_folder)
+                    # Skip log files to keep backup clean
+                    if f.endswith('.log'): continue
+                    zip_f.write(file_abs, file_rel)
+                    
+        # Send zip document to user
+        with open(zip_path, 'rb') as f:
+            bot.send_document(call.message.chat.id, f, caption=f"💾 **50 Shades Hoster Backup Archive**\n🆔 **ID**: `{script_owner_id}`\n📦 Excludes log files.", parse_mode='Markdown')
+            
+        # Clean up zip
+        shutil.rmtree(temp_zip_dir)
+    except Exception as e:
+        logger.error(f"Error in backup_callback: {e}", exc_info=True)
+        bot.send_message(call.message.chat.id, "❌ Error generating backup archive.")
+

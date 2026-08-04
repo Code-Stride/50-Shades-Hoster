@@ -60,9 +60,18 @@ def translate_query(query):
     if 'INSERT OR REPLACE INTO mandatory_channels' in query:
         return "INSERT INTO mandatory_channels (channel_id, channel_username, channel_name, added_by, added_date) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (channel_id) DO UPDATE SET channel_username = EXCLUDED.channel_username, channel_name = EXCLUDED.channel_name, added_by = EXCLUDED.added_by, added_date = EXCLUDED.added_date"
     
+    if 'INSERT OR REPLACE INTO bot_settings' in query:
+        return "INSERT INTO bot_settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+        
+    if 'INSERT OR REPLACE INTO script_settings' in query:
+        return "INSERT INTO script_settings (user_id, file_name, auto_restart) VALUES (%s, %s, %s) ON CONFLICT (user_id, file_name) DO UPDATE SET auto_restart = EXCLUDED.auto_restart"
+
     # Translate INSERT OR IGNORE
     if 'INSERT OR IGNORE INTO admins' in query:
         return "INSERT INTO admins (user_id, added_by, added_date) VALUES (%s, %s, %s) ON CONFLICT (user_id) DO NOTHING"
+        
+    if 'INSERT OR IGNORE INTO license_keys' in query:
+        return "INSERT INTO license_keys (key, days, created_by, created_date) VALUES (%s, %s, %s, %s) ON CONFLICT (key) DO NOTHING"
     
     return query
 
@@ -74,33 +83,32 @@ def init_db():
             conn = get_conn()
             c = conn.cursor()
             
-            q1 = "CREATE TABLE IF NOT EXISTS subscriptions (user_id BIGINT PRIMARY KEY, expiry TEXT)" if DATABASE_URL else "CREATE TABLE IF NOT EXISTS subscriptions (user_id INTEGER PRIMARY KEY, expiry TEXT)"
-            q2 = "CREATE TABLE IF NOT EXISTS user_files (user_id BIGINT, file_name TEXT, file_type TEXT, PRIMARY KEY (user_id, file_name))" if DATABASE_URL else "CREATE TABLE IF NOT EXISTS user_files (user_id INTEGER, file_name TEXT, file_type TEXT, PRIMARY KEY (user_id, file_name))"
-            q3 = "CREATE TABLE IF NOT EXISTS active_users (user_id BIGINT PRIMARY KEY, join_date TEXT, last_seen TEXT)" if DATABASE_URL else "CREATE TABLE IF NOT EXISTS active_users (user_id INTEGER PRIMARY KEY, join_date TEXT, last_seen TEXT)"
-            q4 = "CREATE TABLE IF NOT EXISTS admins (user_id BIGINT PRIMARY KEY, added_by BIGINT, added_date TEXT)" if DATABASE_URL else "CREATE TABLE IF NOT EXISTS admins (user_id INTEGER PRIMARY KEY, added_by INTEGER, added_date TEXT)"
-            q5 = "CREATE TABLE IF NOT EXISTS banned_users (user_id BIGINT PRIMARY KEY, reason TEXT, banned_by BIGINT, ban_date TEXT)" if DATABASE_URL else "CREATE TABLE IF NOT EXISTS banned_users (user_id INTEGER PRIMARY KEY, reason TEXT, banned_by INTEGER, ban_date TEXT)"
-            q6 = "CREATE TABLE IF NOT EXISTS user_limits (user_id BIGINT PRIMARY KEY, file_limit INTEGER, set_by BIGINT, set_date TEXT)" if DATABASE_URL else "CREATE TABLE IF NOT EXISTS user_limits (user_id INTEGER PRIMARY KEY, file_limit INTEGER, set_by INTEGER, set_date TEXT)"
+            q_uid_type = "BIGINT" if DATABASE_URL else "INTEGER"
             
-            c.execute(q1)
-            c.execute(q2)
-            c.execute(q3)
-            c.execute(q4)
-            c.execute(q5)
-            c.execute(q6)
+            c.execute(f"CREATE TABLE IF NOT EXISTS subscriptions (user_id {q_uid_type} PRIMARY KEY, expiry TEXT)")
+            c.execute(f"CREATE TABLE IF NOT EXISTS user_files (user_id {q_uid_type}, file_name TEXT, file_type TEXT, PRIMARY KEY (user_id, file_name))")
+            c.execute(f"CREATE TABLE IF NOT EXISTS active_users (user_id {q_uid_type} PRIMARY KEY, join_date TEXT, last_seen TEXT)")
+            c.execute(f"CREATE TABLE IF NOT EXISTS admins (user_id {q_uid_type} PRIMARY KEY, added_by {q_uid_type}, added_date TEXT)")
+            c.execute(f"CREATE TABLE IF NOT EXISTS banned_users (user_id {q_uid_type} PRIMARY KEY, reason TEXT, banned_by {q_uid_type}, ban_date TEXT)")
+            c.execute(f"CREATE TABLE IF NOT EXISTS user_limits (user_id {q_uid_type} PRIMARY KEY, file_limit INTEGER, set_by {q_uid_type}, set_date TEXT)")
             
-            c.execute('''CREATE TABLE IF NOT EXISTS mandatory_channels
+            # Bot Settings persistent table (Fixes free_mode toggle across restarts)
+            c.execute("CREATE TABLE IF NOT EXISTS bot_settings (key TEXT PRIMARY KEY, value TEXT)")
+            
+            # Script Settings persistent table (Fixes auto_restart toggle across restarts)
+            c.execute(f"CREATE TABLE IF NOT EXISTS script_settings (user_id {q_uid_type}, file_name TEXT, auto_restart INTEGER, PRIMARY KEY (user_id, file_name))")
+            
+            # License Keys persistent table (Fixes Monetization feature keys storage)
+            c.execute(f"CREATE TABLE IF NOT EXISTS license_keys (key TEXT PRIMARY KEY, days INTEGER, created_by {q_uid_type}, created_date TEXT, redeemed_by {q_uid_type}, redeemed_date TEXT)")
+
+            c.execute(f'''CREATE TABLE IF NOT EXISTS mandatory_channels
                          (channel_id TEXT PRIMARY KEY, 
                           channel_username TEXT,
                           channel_name TEXT,
-                          added_by BIGINT,
-                          added_date TEXT)''' if DATABASE_URL else '''CREATE TABLE IF NOT EXISTS mandatory_channels
-                         (channel_id TEXT PRIMARY KEY, 
-                          channel_username TEXT,
-                          channel_name TEXT,
-                          added_by INTEGER,
+                          added_by {q_uid_type},
                           added_date TEXT)''')
                           
-            c.execute(translate_query('CREATE TABLE IF NOT EXISTS install_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id BIGINT, module_name TEXT, package_name TEXT, status TEXT, log TEXT, install_date TEXT)' if DATABASE_URL else 'CREATE TABLE IF NOT EXISTS install_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, module_name TEXT, package_name TEXT, status TEXT, log TEXT, install_date TEXT)'))
+            c.execute(translate_query(f'CREATE TABLE IF NOT EXISTS install_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id {q_uid_type}, module_name TEXT, package_name TEXT, status TEXT, log TEXT, install_date TEXT)'))
             
             # Seed owner and default admin
             seed_q = translate_query('INSERT OR IGNORE INTO admins (user_id, added_by, added_date) VALUES (?, ?, ?)')
@@ -160,6 +168,18 @@ def load_data():
                 'username': channel_username,
                 'name': channel_name
             }
+
+        # Load persistent bot settings (free_mode)
+        c.execute(translate_query("SELECT value FROM bot_settings WHERE key = 'free_mode'"))
+        row = c.fetchone()
+        if row:
+            state.free_mode = row[0].lower() == 'true'
+            logger.info(f"Loaded persistent free_mode setting: {state.free_mode}")
+
+        # Load persistent script settings (auto_restart)
+        c.execute(translate_query("SELECT user_id, file_name, auto_restart FROM script_settings"))
+        for user_id, file_name, auto_restart in c.fetchall():
+            state.script_auto_restart[f"{user_id}_{file_name}"] = auto_restart == 1
 
         conn.close()
         logger.info(f"Data loaded into memory cache successfully.")
@@ -271,6 +291,13 @@ def remove_user_file_db(user_id, file_name):
             if user_id in state.user_files:
                 state.user_files[user_id] = [f for f in state.user_files[user_id] if f[0] != file_name]
                 if not state.user_files[user_id]: del state.user_files[user_id]
+                
+            # Clean up script settings for this file too
+            c.execute(translate_query('DELETE FROM script_settings WHERE user_id = ? AND file_name = ?'), (user_id, file_name))
+            conn.commit()
+            if f"{user_id}_{file_name}" in state.script_auto_restart:
+                del state.script_auto_restart[f"{user_id}_{file_name}"]
+                
             logger.info(f"Removed file '{file_name}' for user {user_id} from DB")
         except Exception as e: logger.error(f"❌ Error removing file for {user_id}, {file_name}: {e}", exc_info=True)
         finally: conn.close()
@@ -423,5 +450,108 @@ def get_recent_install_logs(limit=20):
         except Exception as e:
             logger.error(f"Error getting install logs: {e}", exc_info=True)
             return []
+        finally:
+            conn.close()
+
+# --- New Persistent Settings and Keys Helpers ---
+
+def save_bot_setting(key, value):
+    """Save a global persistent bot setting"""
+    with DB_LOCK:
+        conn = get_conn()
+        c = conn.cursor()
+        try:
+            query = translate_query('INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)')
+            c.execute(query, (key, str(value)))
+            conn.commit()
+            logger.info(f"Saved persistent setting: {key} -> {value}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving bot setting {key}: {e}", exc_info=True)
+            return False
+        finally:
+            conn.close()
+
+def save_script_auto_restart(user_id, file_name, enabled):
+    """Save persistent auto-restart setting for a specific script"""
+    with DB_LOCK:
+        conn = get_conn()
+        c = conn.cursor()
+        try:
+            val = 1 if enabled else 0
+            query = translate_query('INSERT OR REPLACE INTO script_settings (user_id, file_name, auto_restart) VALUES (?, ?, ?)')
+            c.execute(query, (user_id, file_name, val))
+            conn.commit()
+            state.script_auto_restart[f"{user_id}_{file_name}"] = enabled
+            logger.info(f"Saved persistent auto-restart for {user_id}_{file_name} -> {enabled}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving script auto-restart setting for {user_id}_{file_name}: {e}", exc_info=True)
+            return False
+        finally:
+            conn.close()
+
+def generate_license_key_db(key, days, created_by):
+    """Store a generated redeemable subscription license key"""
+    with DB_LOCK:
+        conn = get_conn()
+        c = conn.cursor()
+        try:
+            created_date = datetime.now().isoformat()
+            query = translate_query('INSERT OR IGNORE INTO license_keys (key, days, created_by, created_date) VALUES (?, ?, ?, ?)')
+            c.execute(query, (key, days, created_by, created_date))
+            conn.commit()
+            logger.info(f"License Key {key} ({days} days) generated by Admin {created_by}")
+            return True
+        except Exception as e:
+            logger.error(f"Error storing license key {key}: {e}", exc_info=True)
+            return False
+        finally:
+            conn.close()
+
+def check_and_redeem_license_key_db(key, redeemed_by):
+    """Verify and redeem a license key, extending the user's subscription"""
+    from datetime import timedelta
+    with DB_LOCK:
+        conn = get_conn()
+        c = conn.cursor()
+        try:
+            query = translate_query('SELECT days, redeemed_by FROM license_keys WHERE key = ?')
+            c.execute(query, (key,))
+            row = c.fetchone()
+            if not row:
+                return False, "❌ Invalid License Key! Double check spelling."
+                
+            days, already_redeemed_by = row
+            if already_redeemed_by:
+                return False, f"⚠️ This key has already been redeemed!"
+                
+            # Mark as redeemed
+            redeemed_date = datetime.now().isoformat()
+            upd_q = translate_query('UPDATE license_keys SET redeemed_by = ?, redeemed_date = ? WHERE key = ?')
+            c.execute(upd_q, (redeemed_by, redeemed_date, key))
+            conn.commit()
+            
+            # Update user's subscription
+            current_sub = state.user_subscriptions.get(redeemed_by)
+            now = datetime.now()
+            if current_sub and current_sub.get('expiry') > now:
+                new_expiry = current_sub['expiry'] + timedelta(days=days)
+            else:
+                new_expiry = now + timedelta(days=days)
+                
+            expiry_str = new_expiry.isoformat()
+            sub_q = translate_query('INSERT OR REPLACE INTO subscriptions (user_id, expiry) VALUES (?, ?)')
+            c.execute(sub_q, (redeemed_by, expiry_str))
+            conn.commit()
+            
+            # Sync to cache
+            state.user_subscriptions[redeemed_by] = {'expiry': new_expiry}
+            logger.warning(f"Key {key} redeemed successfully by {redeemed_by}. Plan extended by {days} days.")
+            return True, f"🎉 **Success**! Plan activated/extended by **{days} days**! Expiry: {new_expiry.strftime('%Y-%m-%d %H:%M')}"
+            
+        except Exception as e:
+            logger.error(f"Error redeeming license key {key}: {e}", exc_info=True)
+            return False, f"❌ Error processing key redemption: {e}"
         finally:
             conn.close()

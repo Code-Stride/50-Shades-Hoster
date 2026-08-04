@@ -579,10 +579,10 @@ def process_zip_file(zip_path, user_id, user_folder, file_name_zip, reply_messag
             except Exception as e: 
                 logger.error(f"Failed to clean temp dir {temp_dir}: {e}", exc_info=True)
 
-# --- Active Watchdog Thread for Zombie & Crash Cleanup (Fixes Bug #1) ---
+# --- Active Watchdog Thread for Zombie & Crash Cleanup (Fixes Bug #1 & Auto-Restart Feature) ---
 def start_watchdog_thread():
     def watchdog_loop():
-        logger.info("👀 Watchdog thread started. Monitoring processes...")
+        logger.info("👀 Watchdog thread started. Monitoring processes with Auto-Restart functionality...")
         while True:
             try:
                 time.sleep(15) # Check every 15 seconds
@@ -606,13 +606,50 @@ def start_watchdog_thread():
                                 except Exception as log_e:
                                     logger.error(f"Error closing log file for {script_key}: {log_e}")
                             
-                            # Notify script owner directly! Proactive alert! (Fixes Bug #4)
                             chat_id = script_info.get('chat_id')
                             file_name = script_info.get('file_name', 'script')
-                            try:
-                                bot.send_message(chat_id, f"⚠️ **Alert**: Your script `{file_name}` has stopped running (Exit Code: {process.returncode}).", parse_mode='Markdown')
-                            except Exception as notify_e:
-                                logger.error(f"Failed to notify user {chat_id} about stop: {notify_e}")
+                            script_owner_id = script_info.get('script_owner_id')
+                            user_folder = script_info.get('user_folder')
+                            script_type = script_info.get('type')
+                            restarts = script_info.get('restarts', 0)
+                            
+                            # Check if Auto-Restart is toggled ON for this script
+                            auto_restart_enabled = state.script_auto_restart.get(f"{script_owner_id}_{file_name}", False)
+                            
+                            if auto_restart_enabled:
+                                if restarts < 3:
+                                    restarts += 1
+                                    script_path = os.path.join(user_folder, file_name)
+                                    logger.warning(f"🔄 Auto-Restarting dead process {script_key} (Attempt {restarts}/3)...")
+                                    
+                                    # Trigger run in a background thread
+                                    if script_type == 'py':
+                                        threading.Thread(target=run_script, args=(script_path, script_owner_id, user_folder, file_name, chat_id)).start()
+                                    elif script_type == 'js':
+                                        threading.Thread(target=run_js_script, args=(script_path, script_owner_id, user_folder, file_name, chat_id)).start()
+                                        
+                                    # Tiny sleep to let it register in bot_scripts
+                                    time.sleep(1.0)
+                                    if script_key in state.bot_scripts:
+                                        state.bot_scripts[script_key]['restarts'] = restarts
+                                        
+                                    try:
+                                        bot.send_message(chat_id, f"🔄 **Auto-Restart (Attempt {restarts}/3)**: Your script `{file_name}` stopped (Exit Code: {process.returncode}) but has been automatically restarted!", parse_mode='Markdown')
+                                    except Exception as notify_e:
+                                        logger.error(f"Failed to notify user {chat_id} about auto-restart: {notify_e}")
+                                    continue
+                                else:
+                                    logger.warning(f"❌ Auto-Restart failed for {script_key} after 3 attempts.")
+                                    try:
+                                        bot.send_message(chat_id, f"⚠️ **Auto-Restart Failed**: Your script `{file_name}` crashed 3 consecutive times. Auto-restart disabled for stability. Please fix any bugs and start manually.", parse_mode='Markdown')
+                                    except Exception as notify_e:
+                                        logger.error(f"Failed to notify user {chat_id} about auto-restart failure: {notify_e}")
+                            else:
+                                # Normal notification without restart
+                                try:
+                                    bot.send_message(chat_id, f"⚠️ **Alert**: Your script `{file_name}` has stopped running (Exit Code: {process.returncode}).", parse_mode='Markdown')
+                                except Exception as notify_e:
+                                    logger.error(f"Failed to notify user {chat_id} about stop: {notify_e}")
                                 
                             # Delete from running cache
                             if script_key in state.bot_scripts:
