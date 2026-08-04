@@ -41,6 +41,7 @@ ADMIN_ID = get_env("ADMIN_ID", default=OWNER_ID, cast=int)
 # Optional values
 YOUR_USERNAME = get_env("YOUR_USERNAME", required=False)
 UPDATE_CHANNEL = get_env("UPDATE_CHANNEL", required=False)
+WEB_PANEL_URL = get_env("WEB_PANEL_URL", default="https://your-bot-domain.up.railway.app")
 
 # Folder setup
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))

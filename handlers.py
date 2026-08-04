@@ -20,7 +20,8 @@ from config import (
     OWNER_ID, ADMIN_ID, YOUR_USERNAME, UPDATE_CHANNEL, BASE_DIR, 
     UPLOAD_BOTS_DIR, FREE_USER_LIMIT, SUBSCRIBED_USER_LIMIT, 
     ADMIN_LIMIT, OWNER_LIMIT, SECURITY_CONFIG, 
-    COMMAND_BUTTONS_LAYOUT_USER_SPEC, ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC
+    COMMAND_BUTTONS_LAYOUT_USER_SPEC, ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC,
+    WEB_PANEL_URL
 )
 from bot_instance import bot
 import state
@@ -675,6 +676,11 @@ def _logic_help(message):
 🎭 **50 Shades Hoster - Help Guide**
 
 Welcome to the most secure, completely anonymous, and isolated hosting environment for your Python (`.py`) and JavaScript (`.js`) scripts!
+
+🌐 **Web Dashboard & In-Browser IDE:**
+• You can manage your files, view live script logs, upload files via drag-and-drop, and edit your code in real-time right from your web browser!
+• 👉 **[Click Here to Open Web Panel]({WEB_PANEL_URL})**
+• 🔑 **To Login**: Enter your numeric Telegram User ID and your **16-character Anonymous Hash ID** (which you see when you run `/start`).
 
 ⚙️ **How It Works:**
 1️⃣ **Upload your script**: Simply send your `.py`, `.js` file, or a `.zip` archive containing your bot.
@@ -1704,6 +1710,9 @@ def back_to_main_callback(call):
     main_menu_text = (f"〽️ **Welcome back to 50 Shades Hoster!**\n\n"
                       f"🆔 **Anonymous Hash ID**: `{user_hash}`\n"
                       f"🔰 **Status**: {user_status}{expiry_info}\n📁 **Files**: {current_files} / {limit_str}\n\n"
+                      f"🌐 **Web Dashboard & IDE**:\n"
+                      f"👉 **[Click Here to Open Web Panel]({WEB_PANEL_URL})**\n"
+                      f"🔑 *Login using your User ID and the Hash Key above!*\n\n"
                       f"👇 Use the restructured buttons below to control.")
     try:
         bot.answer_callback_query(call.id)
