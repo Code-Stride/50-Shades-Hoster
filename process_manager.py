@@ -225,12 +225,15 @@ def attempt_install_pip(module_name, reply_target, manual_request=False):
             save_install_log(chat_id, module_name, package_name, "success", log_msg)
             return True, log_msg
         else:
-            error_msg = f"❌ Failed to install `{package_name}` for `{module_name}`.\nLog:\n```\n{result.stderr or result.stdout}\n```"
-            logger.error(error_msg)
-            if len(error_msg) > 3800: error_msg = error_msg[:3800] + "\n... (Log truncated)"
-            bot.send_message(chat_id, error_msg, parse_mode='Markdown')
-            save_install_log(chat_id, module_name, package_name, "failed", error_msg)
-            return False, error_msg
+            from telebot.util import escape_html
+            log_content = result.stderr or result.stdout
+            escaped_log = escape_html(log_content)
+            if len(escaped_log) > 3000: escaped_log = escaped_log[:3000] + "\n... (Log truncated)"
+            error_msg = f"❌ <b>Failed to install</b> <code>{package_name}</code> for <code>{module_name}</code>.\n<b>Log</b>:\n<pre>{escaped_log}</pre>"
+            logger.error(f"Failed to install package {package_name}")
+            bot.send_message(chat_id, error_msg, parse_mode='HTML')
+            save_install_log(chat_id, module_name, package_name, "failed", log_content)
+            return False, log_content
     except Exception as e:
         error_msg = f"❌ Error installing `{package_name}`: {str(e)}"
         logger.error(error_msg, exc_info=True)
@@ -259,12 +262,15 @@ def attempt_install_npm(module_name, user_folder, reply_target, manual_request=F
             save_install_log(chat_id, module_name, module_name, "success", log_msg)
             return True, log_msg
         else:
-            error_msg = f"❌ Failed to install Node package `{module_name}`.\nLog:\n```\n{result.stderr or result.stdout}\n```"
-            logger.error(error_msg)
-            if len(error_msg) > 3800: error_msg = error_msg[:3800] + "\n... (Log truncated)"
-            bot.send_message(chat_id, error_msg, parse_mode='Markdown')
-            save_install_log(chat_id, module_name, module_name, "failed", error_msg)
-            return False, error_msg
+            from telebot.util import escape_html
+            log_content = result.stderr or result.stdout
+            escaped_log = escape_html(log_content)
+            if len(escaped_log) > 3000: escaped_log = escaped_log[:3000] + "\n... (Log truncated)"
+            error_msg = f"❌ <b>Failed to install Node package</b> <code>{module_name}</code>.\n<b>Log</b>:\n<pre>{escaped_log}</pre>"
+            logger.error(f"Failed to install npm package {module_name}")
+            bot.send_message(chat_id, error_msg, parse_mode='HTML')
+            save_install_log(chat_id, module_name, module_name, "failed", log_content)
+            return False, log_content
     except FileNotFoundError:
          error_msg = "❌ Error: 'npm' not found. Ensure Node.js/npm are installed and in PATH."
          logger.error(error_msg)
@@ -338,8 +344,9 @@ def run_script(script_path, script_owner_id, user_folder, file_name, reply_targe
                             bot.send_message(target_chat_id, f"❌ Install failed. Cannot run '{file_name}'.")
                             return
                     else:
-                         error_summary = stderr[:500]
-                         bot.send_message(target_chat_id, f"❌ Error in script pre-check for '{file_name}':\n```\n{error_summary}\n```\nFix the script.", parse_mode='Markdown')
+                         from telebot.util import escape_html
+                         escaped_summary = escape_html(stderr[:500])
+                         bot.send_message(target_chat_id, f"❌ <b>Error in script pre-check for '{file_name}'</b>:\n<pre>{escaped_summary}</pre>\nFix the script.", parse_mode='HTML')
                          return
             except subprocess.TimeoutExpired:
                 logger.info("Python Pre-check timed out (>5s), imports likely OK. Killing check process.")
@@ -468,8 +475,9 @@ def run_js_script(script_path, script_owner_id, user_folder, file_name, reply_ta
                                  bot.send_message(target_chat_id, f"❌ NPM Install failed. Cannot run '{file_name}'.")
                                  return
                         else: logger.info(f"Skipping npm install for relative/core: {module_name}")
-                    error_summary = stderr[:500]
-                    bot.send_message(target_chat_id, f"❌ Error in JS script pre-check for '{file_name}':\n```\n{error_summary}\n```\nFix script or install manually.", parse_mode='Markdown')
+                    from telebot.util import escape_html
+                    escaped_summary = escape_html(stderr[:500])
+                    bot.send_message(target_chat_id, f"❌ <b>Error in JS script pre-check for '{file_name}'</b>:\n<pre>{escaped_summary}</pre>\nFix script or install manually.", parse_mode='HTML')
                     return
             except subprocess.TimeoutExpired:
                 logger.info("JS Pre-check timed out (>5s), imports likely OK. Killing check process.")
@@ -575,10 +583,13 @@ def process_zip_file(zip_path, user_id, user_folder, file_name_zip, reply_messag
                 logger.info(f"pip install from requirements.txt OK. Output:\n{result.stdout}")
                 bot.send_message(chat_id, f"✅ Python deps from `{req_file}` installed.")
             except subprocess.CalledProcessError as e:
-                error_msg = f"❌ Failed to install Python deps from `{req_file}`.\nLog:\n```\n{e.stderr or e.stdout}\n```"
-                logger.error(error_msg)
-                if len(error_msg) > 3800: error_msg = error_msg[:3800] + "\n... (Log truncated)"
-                bot.send_message(chat_id, error_msg, parse_mode='Markdown')
+                from telebot.util import escape_html
+                log_content = e.stderr or e.stdout
+                escaped_log = escape_html(log_content)
+                if len(escaped_log) > 3000: escaped_log = escaped_log[:3000] + "\n... (Log truncated)"
+                error_msg = f"❌ <b>Failed to install Python deps from</b> <code>{req_file}</code>.\n<b>Log</b>:\n<pre>{escaped_log}</pre>"
+                logger.error(f"Failed to install python deps from {req_file}")
+                bot.send_message(chat_id, error_msg, parse_mode='HTML')
                 return
             except Exception as e:
                  error_msg = f"❌ Unexpected error installing Python deps: {e}"
@@ -598,10 +609,13 @@ def process_zip_file(zip_path, user_id, user_folder, file_name_zip, reply_messag
                 bot.send_message(chat_id, "❌ 'npm' not found. Cannot install Node deps.")
                 return 
             except subprocess.CalledProcessError as e:
-                error_msg = f"❌ Failed to install Node deps from `{pkg_json}`.\nLog:\n```\n{e.stderr or e.stdout}\n```"
-                logger.error(error_msg)
-                if len(error_msg) > 3800: error_msg = error_msg[:3800] + "\n... (Log truncated)"
-                bot.send_message(chat_id, error_msg, parse_mode='Markdown')
+                from telebot.util import escape_html
+                log_content = e.stderr or e.stdout
+                escaped_log = escape_html(log_content)
+                if len(escaped_log) > 3000: escaped_log = escaped_log[:3000] + "\n... (Log truncated)"
+                error_msg = f"❌ <b>Failed to install Node deps from</b> <code>{pkg_json}</code>.\n<b>Log</b>:\n<pre>{escaped_log}</pre>"
+                logger.error(f"Failed to install Node deps from {pkg_json}")
+                bot.send_message(chat_id, error_msg, parse_mode='HTML')
                 return
             except Exception as e:
                  error_msg = f"❌ Unexpected error installing Node deps: {e}"
