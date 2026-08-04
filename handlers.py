@@ -225,45 +225,42 @@ def process_manual_install_module(message):
 
 def create_main_menu_inline(user_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
-    buttons = [
-        btn('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}', style='primary'),
-        btn('📤 Upload File', callback_data='upload', style='success'),
-        btn('📂 Check Files', callback_data='check_files', style='primary'),
-        btn('⚡ Bot Speed', callback_data='speed', style='primary'),
-        btn('📦 Manual Install', callback_data='manual_install', style='success'),
-        btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}', style='primary')
-    ]
-
+    
+    # Common user buttons - Cleaned for Public Launch (Fixes Leaks & DoS Risks)
+    btn_updates = btn('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}', style='primary')
+    btn_upload = btn('📤 Upload File', callback_data='upload', style='success')
+    btn_check = btn('📂 Check Files', callback_data='check_files', style='primary')
+    btn_speed = btn('⚡ Bot Speed', callback_data='speed', style='primary')
+    btn_contact = btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}', style='primary')
+    
     if user_id in admin_ids:
-        admin_buttons = [
-            btn('💳 Subscriptions', callback_data='subscription', style='primary'), #0
-            btn('📊 Statistics', callback_data='stats', style='primary'), #1
-            btn('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot', 
-                callback_data='lock_bot' if not bot_locked else 'unlock_bot',
-                style='danger' if not bot_locked else 'success'), #2
-            btn('📢 Broadcast', callback_data='broadcast', style='primary'), #3
-            btn('👑 Admin Panel', callback_data='admin_panel', style='danger'), #4
-            btn('🟢 Run All Scripts', callback_data='run_all_scripts', style='success'), #5
-            btn('📢 Channel Add', callback_data='manage_mandatory_channels', style='success'), #6
-            btn('👥 User Management', callback_data='user_management', style='danger'), #7
-            btn('🛠️ Admin Install', callback_data='admin_install', style='success'), #8
-            btn('⚙️ Settings', callback_data='admin_settings', style='primary') #9
-        ]
-        markup.add(buttons[0]) # Updates
-        markup.add(buttons[1], buttons[2]) # Upload, Check Files
-        markup.add(buttons[3], admin_buttons[0]) # Speed, Subscriptions
-        markup.add(admin_buttons[1], admin_buttons[3]) # Stats, Broadcast
-        markup.add(admin_buttons[2], admin_buttons[5]) # Lock Bot, Run All Scripts
-        markup.add(admin_buttons[6], admin_buttons[8]) # Channel Management, Admin Install
-        markup.add(admin_buttons[7], admin_buttons[9]) # User Management, Settings
-        markup.add(admin_buttons[4]) # Admin Panel
-        markup.add(buttons[5]) # Contact
+        btn_sub = btn('💳 Subscriptions', callback_data='subscription', style='primary')
+        btn_stats = btn('📊 Statistics', callback_data='stats', style='primary')
+        btn_lock = btn('🔒 Lock Bot' if not bot_locked else '🔓 Unlock Bot', 
+                       callback_data='lock_bot' if not bot_locked else 'unlock_bot',
+                       style='danger' if not bot_locked else 'success')
+        btn_broadcast = btn('📢 Broadcast', callback_data='broadcast', style='primary')
+        btn_admin_panel = btn('👑 Admin Panel', callback_data='admin_panel', style='danger')
+        btn_channel_add = btn('📢 Channel Add', callback_data='manage_mandatory_channels', style='success')
+        btn_user_mgmt = btn('👥 User Management', callback_data='user_management', style='danger')
+        btn_admin_install = btn('🛠️ Admin Install', callback_data='admin_install', style='success')
+        btn_settings = btn('⚙️ Settings', callback_data='admin_settings', style='primary')
+        
+        # Grid layout for Admin Main Menu
+        markup.add(btn_updates)
+        markup.add(btn_upload, btn_check)
+        markup.add(btn_speed, btn_sub)
+        markup.add(btn_stats, btn_broadcast)
+        markup.add(btn_lock, btn_admin_panel)
+        markup.add(btn_channel_add, btn_admin_install)
+        markup.add(btn_user_mgmt, btn_settings)
+        markup.add(btn_contact)
     else:
-        markup.add(buttons[0])
-        markup.add(buttons[1], buttons[2])
-        markup.add(buttons[3], buttons[4]) # Speed, Manual Install
-        markup.add(btn('📊 Statistics', callback_data='stats', style='primary')) # Allow non-admins to see stats too
-        markup.add(buttons[5])
+        # Balanced Grid layout for Public Regular Users (Hides system statistics and manual install to avoid VPS overload)
+        markup.add(btn_updates)
+        markup.add(btn_upload, btn_check)
+        markup.add(btn_speed, btn_contact)
+        
     return markup
 
 def create_reply_keyboard_main_menu(user_id):
@@ -932,8 +929,12 @@ def _logic_contact_owner(message):
     bot.reply_to(message, "Click to contact Owner:", reply_markup=markup)
 
 def _logic_manual_install(message):
-    """Handle manual installation request from user"""
-    manual_install_module_init(message)
+    """Handle manual installation request from user (Restricted on Public Launch for safety)"""
+    user_id = message.from_user.id
+    if user_id in admin_ids:
+        manual_install_module_init(message)
+    else:
+        bot.reply_to(message, "⚠️ **Manual Installation Restricted**:\n\nFor server safety, manual pip/npm installations can only be initiated by Admins. If you need any packages installed, please contact the **Owner**.", parse_mode='Markdown')
 
 def _logic_help(message):
     help_text = """
@@ -1062,80 +1063,14 @@ def _logic_admin_settings(message):
                  reply_markup=create_admin_settings_menu())
 
 def _logic_run_all_scripts(message_or_call):
-    if isinstance(message_or_call, telebot.types.Message):
-        admin_user_id = message_or_call.from_user.id
-        admin_chat_id = message_or_call.chat.id
-        reply_func = lambda text, **kwargs: bot.reply_to(message_or_call, text, **kwargs)
-        admin_message_obj_for_script_runner = message_or_call
-    elif isinstance(message_or_call, telebot.types.CallbackQuery):
-        admin_user_id = message_or_call.from_user.id
-        admin_chat_id = message_or_call.message.chat.id
-        bot.answer_callback_query(message_or_call.id)
-        reply_func = lambda text, **kwargs: bot.send_message(admin_chat_id, text, **kwargs)
-        admin_message_obj_for_script_runner = message_or_call.message 
-    else:
-        logger.error("Invalid argument for _logic_run_all_scripts")
-        return
+    """Feature disabled for server stability on Public Launch"""
+    chat_id = message_or_call.message.chat.id if isinstance(message_or_call, telebot.types.CallbackQuery) else message_or_call.chat.id
+    if isinstance(message_or_call, telebot.types.CallbackQuery):
+        try: bot.answer_callback_query(message_or_call.id)
+        except: pass
+    bot.send_message(chat_id, "⚠️ **Feature Disabled**:\n\nFor server stability and to prevent resource exhaustion, the 'Run All Scripts' action is disabled on the public launcher. Users should run their own files individually.", parse_mode='Markdown')
+    return
 
-    if admin_user_id not in admin_ids:
-        reply_func("⚠️ Admin permissions required.")
-        return
-
-    reply_func("⏳ Starting process to run all user scripts. This may take a while...")
-    logger.info(f"Admin {admin_user_id} initiated 'run all scripts' from chat {admin_chat_id}.")
-
-    started_count = 0; attempted_users = 0; skipped_files = 0; error_files_details = []
-
-    # Use a copy of user_files keys and values to avoid modification issues during iteration
-    all_user_files_snapshot = dict(user_files)
-
-    for target_user_id, files_for_user in all_user_files_snapshot.items():
-        if not files_for_user: continue
-        attempted_users += 1
-        logger.info(f"Processing scripts for user {target_user_id}...")
-        user_folder = get_user_folder(target_user_id)
-
-        for file_name, file_type in files_for_user:
-            # script_owner_id for key context is target_user_id
-            if not is_bot_running(target_user_id, file_name):
-                file_path = os.path.join(user_folder, file_name)
-                if os.path.exists(file_path):
-                    logger.info(f"Admin {admin_user_id} attempting to start '{file_name}' ({file_type}) for user {target_user_id}.")
-                    try:
-                        if file_type == 'py':
-                            threading.Thread(target=run_script, args=(file_path, target_user_id, user_folder, file_name, admin_message_obj_for_script_runner)).start()
-                            started_count += 1
-                        elif file_type == 'js':
-                            threading.Thread(target=run_js_script, args=(file_path, target_user_id, user_folder, file_name, admin_message_obj_for_script_runner)).start()
-                            started_count += 1
-                        else:
-                            logger.warning(f"Unknown file type '{file_type}' for {file_name} (user {target_user_id}). Skipping.")
-                            error_files_details.append(f"`{file_name}` (User {target_user_id}) - Unknown type")
-                            skipped_files += 1
-                        time.sleep(0.7) # Increased delay slightly
-                    except Exception as e:
-                        logger.error(f"Error queueing start for '{file_name}' (user {target_user_id}): {e}")
-                        error_files_details.append(f"`{file_name}` (User {target_user_id}) - Start error")
-                        skipped_files += 1
-                else:
-                    logger.warning(f"File '{file_name}' for user {target_user_id} not found at '{file_path}'. Skipping.")
-                    error_files_details.append(f"`{file_name}` (User {target_user_id}) - File not found")
-                    skipped_files += 1
-            # else: logger.info(f"Script '{file_name}' for user {target_user_id} already running.")
-
-    summary_msg = (f"✅ All Users' Scripts - Processing Complete:\n\n"
-                   f"▶️ Attempted to start: {started_count} scripts.\n"
-                   f"👥 Users processed: {attempted_users}.\n")
-    if skipped_files > 0:
-        summary_msg += f"⚠️ Skipped/Error files: {skipped_files}\n"
-        if error_files_details:
-             summary_msg += "Details (first 5):\n" + "\n".join([f"  - {err}" for err in error_files_details[:5]])
-             if len(error_files_details) > 5: summary_msg += "\n  ... and more (check logs)."
-
-    reply_func(summary_msg, parse_mode='Markdown')
-    logger.info(f"Run all scripts finished. Admin: {admin_user_id}. Started: {started_count}. Skipped/Errors: {skipped_files}")
-
-# --- New Admin Functions for Channel Management ---
 def _logic_manage_mandatory_channels(message):
     """Manage mandatory channels - for admin only"""
     if message.from_user.id not in admin_ids:

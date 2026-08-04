@@ -71,9 +71,8 @@ SECURITY_CONFIG = {
 COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["📢 Updates Channel"],
     ["📤 Upload File", "📂 Check Files"],
-    ["⚡ Bot Speed", "📊 Statistics"],
-    ["📞 Contact Owner"],
-    ["📦 Manual Install", "🆘 Help"]
+    ["⚡ Bot Speed", "📞 Contact Owner"],
+    ["🆘 Help"]
 ]
 
 ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
@@ -81,8 +80,8 @@ ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
     ["📤 Upload File", "📂 Check Files"],
     ["⚡ Bot Speed", "📊 Statistics"],
     ["💳 Subscriptions", "📢 Broadcast"],
-    ["🔒 Lock Bot", "🟢 Running All Code"],
-    ["👑 Admin Panel", "📞 Contact Owner"],
-    ["📢 Channel Add", "🛠️ Manual Install"],
-    ["👥 User Management", "⚙️ Settings"]
+    ["🔒 Lock Bot", "👑 Admin Panel"],
+    ["📞 Contact Owner", "📢 Channel Add"],
+    ["👥 User Management", "🛠️ Manual Install"],
+    ["⚙️ Settings"]
 ]
