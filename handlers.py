@@ -1596,7 +1596,9 @@ def logs_bot_callback(call):
                 else: log_content = "...\n" + log_content 
             if not log_content.strip(): log_content = "(No visible content)"
 
-            bot.send_message(chat_id_for_reply, f"📜 Logs for `{file_name}` (User `{script_owner_id}`):\n```\n{log_content}\n```", parse_mode='Markdown')
+            from telebot.util import escape_html
+            escaped_log = escape_html(log_content)
+            bot.send_message(chat_id_for_reply, f"📜 <b>Logs for</b> <code>{file_name}</code> (User <code>{script_owner_id}</code>):\n<pre>{escaped_log}</pre>", parse_mode='HTML')
         except Exception as e:
             logger.error(f"Error reading/sending log {log_path}: {e}", exc_info=True)
             bot.send_message(chat_id_for_reply, f"❌ Error reading log for `{file_name}`.")
@@ -3074,15 +3076,18 @@ def edit_view_callback(call):
         markup = types.InlineKeyboardMarkup()
         markup.add(btn("🔙 Back", callback_data=f"expfile_{script_owner_id}_{file_name}", style='primary'))
         
-        view_text = f"🔍 **Viewer**: `{file_name}`"
+        from telebot.util import escape_html
+        escaped_code = escape_html(code_content)
+        
+        view_text = f"🔍 <b>Viewer</b>: <code>{file_name}</code>"
         if truncated:
-            view_text += " *(Truncated - File too large for direct Telegram view)*"
+            view_text += " <i>(Truncated - File too large for direct Telegram view)</i>"
             
-        view_text += f"\n\n```{lang}\n{code_content}\n```"
+        view_text += f"\n\n<pre>{escaped_code}</pre>"
         if truncated:
-            view_text += "\n⚠️ *Truncated. Please download backup zip to view full code.*"
+            view_text += "\n⚠️ <i>Truncated. Please download backup zip to view full code.</i>"
             
-        bot.edit_message_text(view_text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+        bot.edit_message_text(view_text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='HTML')
     except Exception as e:
         logger.error(f"Error in edit_view_callback: {e}", exc_info=True)
         bot.send_message(call.message.chat.id, "❌ Error loading file content.")
