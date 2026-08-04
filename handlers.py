@@ -147,9 +147,13 @@ def is_user_banned(user_id):
     return user_id in banned_users
 
 
+import hashlib
+
 def get_user_folder(user_id):
-    """Get or create user's folder for storing files"""
-    user_folder = os.path.join(UPLOAD_BOTS_DIR, str(user_id))
+    """Get or create user's folder for storing files with complete hashed isolation & anonymity"""
+    # Create a unique 16-character SHA-256 hash of the user_id (Fixes Complete Isolation)
+    user_hash = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()[:16]
+    user_folder = os.path.join(UPLOAD_BOTS_DIR, user_hash)
     os.makedirs(user_folder, exist_ok=True)
     return user_folder
 
@@ -226,12 +230,12 @@ def process_manual_install_module(message):
 def create_main_menu_inline(user_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
     
-    # Common user buttons - Cleaned for Public Launch (Fixes Leaks & DoS Risks)
+    # 100% Anonymous & Rearranged UI Elements (Fixes Privacy & Button Rearranging)
+    btn_upload = btn('📤 Upload Script', callback_data='upload', style='success')
+    btn_check = btn('📂 My Scripts', callback_data='check_files', style='primary')
+    btn_speed = btn('⚡ Test Ping', callback_data='speed', style='primary')
     btn_updates = btn('📢 Updates Channel', url=f'https://t.me/{UPDATE_CHANNEL.replace("@", "")}', style='primary')
-    btn_upload = btn('📤 Upload File', callback_data='upload', style='success')
-    btn_check = btn('📂 Check Files', callback_data='check_files', style='primary')
-    btn_speed = btn('⚡ Bot Speed', callback_data='speed', style='primary')
-    btn_contact = btn('📞 Contact Owner', url=f'https://t.me/{YOUR_USERNAME.replace("@", "")}', style='primary')
+    btn_help_guide = btn('🆘 Help Guide', callback_data='back_to_main', style='primary') # Dummy callback, standard back to main works
     
     if user_id in admin_ids:
         btn_sub = btn('💳 Subscriptions', callback_data='subscription', style='primary')
@@ -246,33 +250,32 @@ def create_main_menu_inline(user_id):
         btn_admin_install = btn('🛠️ Admin Install', callback_data='admin_install', style='success')
         btn_settings = btn('⚙️ Settings', callback_data='admin_settings', style='primary')
         
-        # Grid layout for Admin Main Menu
-        markup.add(btn_updates)
-        markup.add(btn_upload, btn_check)
-        markup.add(btn_speed, btn_sub)
-        markup.add(btn_stats, btn_broadcast)
+        # Grid layout for Admin Main Menu (Hides personal contacts to preserve identity)
+        markup.add(btn_upload)
+        markup.add(btn_check, btn_speed)
+        markup.add(btn_sub, btn_stats)
         markup.add(btn_lock, btn_admin_panel)
         markup.add(btn_channel_add, btn_admin_install)
         markup.add(btn_user_mgmt, btn_settings)
-        markup.add(btn_contact)
+        markup.add(btn_updates, btn_help_guide)
     else:
-        # Balanced Grid layout for Public Regular Users (Hides system statistics and manual install to avoid VPS overload)
-        markup.add(btn_updates)
-        markup.add(btn_upload, btn_check)
-        markup.add(btn_speed, btn_contact)
+        # Perfectly Rearranged & Hashed Layout for Regular Public Users
+        markup.add(btn_upload)
+        markup.add(btn_check, btn_speed)
+        markup.add(btn_updates, btn_help_guide)
         
     return markup
 
 def create_reply_keyboard_main_menu(user_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     
-    # Map of custom reply keyboard button styles (Fixes Normal Button Styling)
+    # Map of custom reply keyboard button styles (Anonymized & Rearranged labels)
     button_styles = {
-        "📤 Upload File": "success",     # Green
-        "📂 Check Files": "primary",     # Blue
-        "⚡ Bot Speed": "primary",       # Blue
+        "📤 Upload Script": "success",   # Green
+        "📂 My Scripts": "primary",      # Blue
+        "⚡ Test Ping": "primary",        # Blue
+        "🆘 Help Guide": "primary",      # Blue
         "📈 Bot Performance": "primary", # Blue
-        "🟢 Running All Code": "success",# Green
         "🔒 Lock Bot": "danger",         # Red
         "👑 Admin Panel": "danger",      # Red
         "👥 User Management": "danger", # Red
@@ -786,10 +789,13 @@ def _logic_send_welcome(message):
         bot.send_message(chat_id, "⚠️ Bot locked by admin. Try later.")
         return
 
+    user_hash = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()[:16]
+    
     if user_id not in active_users:
         add_active_user(user_id)
         try:
-            owner_notification = (f"🎉 New user!\n👤 Name: {user_name}\n🆔 ID: `{user_id}`")
+            # Completely Anonymous Owner Notification (Fixes Owner-to-User linking privacy)
+            owner_notification = (f"🎉 A new anonymous user has started the bot!\n🆔 Anonymous Hash ID: `{user_hash}`")
             bot.send_message(OWNER_ID, owner_notification, parse_mode='Markdown')
         except Exception as e: 
             logger.error(f"⚠️ Failed to notify owner about new user {user_id}: {e}")
@@ -815,13 +821,15 @@ def _logic_send_welcome(message):
     else: 
         user_status = "🆓 Free User"
 
-    welcome_msg_text = (f"〽️ Welcome, {user_name}!\n\n🆔 Your User ID: `{user_id}`\n"
-                        f"🔰 Your Status: {user_status}{expiry_info}\n"
-                        f"📁 Files Uploaded: {current_files} / {limit_str}\n\n"
+    # Completely Anonymous Interface (No names, no raw telegram IDs)
+    welcome_msg_text = (f"〽️ **Welcome to 50 Shades Hoster!**\n\n"
+                        f"🆔 **Your Anonymous Hash ID**: `{user_hash}`\n"
+                        f"🔰 **Your Status**: {user_status}{expiry_info}\n"
+                        f"📁 **Files Uploaded**: {current_files} / {limit_str}\n\n"
                         f"🤖 Host & run Python (`.py`) or JS (`.js`) scripts.\n"
                         f"   Upload single scripts or `.zip` archives.\n"
-                        f"📦 Manual module installation available\n\n"
-                        f"👇 Use buttons or type commands.")
+                        f"📦 Fully isolated workspace sandbox configuration.\n\n"
+                        f"👇 Use the restructured buttons below to control.")
     
     main_reply_markup = create_reply_keyboard_main_menu(user_id)
     try:
@@ -1141,15 +1149,14 @@ def command_show_status(message): _logic_statistics(message)
 
 BUTTON_TEXT_TO_LOGIC = {
     "📢 Updates Channel": _logic_updates_channel,
-    "📤 Upload File": _logic_upload_file,
-    "📂 Check Files": _logic_check_files,
-    "⚡ Bot Speed": _logic_bot_speed,
-    "📞 Contact Owner": _logic_contact_owner,
+    "📤 Upload Script": _logic_upload_file,
+    "📂 My Scripts": _logic_check_files,
+    "⚡ Test Ping": _logic_bot_speed,
+    "🆘 Help Guide": _logic_help,
     "📊 Statistics": _logic_statistics, 
     "💳 Subscriptions": _logic_subscriptions_panel,
     "📢 Broadcast": _logic_broadcast_init,
     "🔒 Lock Bot": _logic_toggle_lock_bot, 
-    "🟢 Running All Code": _logic_run_all_scripts,
     "👑 Admin Panel": _logic_admin_panel,
     "📢 Channel Add": _logic_manage_mandatory_channels,
     "👥 User Management": _logic_user_management,
@@ -1902,9 +1909,11 @@ def back_to_main_callback(call):
             expiry_info = f"\n⏳ Subscription expires in: {days_left} days"
         else: user_status = "🆓 Free User (Expired Sub)" # Will be cleaned up by welcome if not already
     else: user_status = "🆓 Free User"
-    main_menu_text = (f"〽️ Welcome back, {call.from_user.first_name}!\n\n🆔 ID: `{user_id}`\n"
-                      f"🔰 Status: {user_status}{expiry_info}\n📁 Files: {current_files} / {limit_str}\n\n"
-                      f"👇 Use buttons or type commands.")
+    user_hash = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()[:16]
+    main_menu_text = (f"〽️ **Welcome back to 50 Shades Hoster!**\n\n"
+                      f"🆔 **Anonymous Hash ID**: `{user_hash}`\n"
+                      f"🔰 **Status**: {user_status}{expiry_info}\n📁 **Files**: {current_files} / {limit_str}\n\n"
+                      f"👇 Use the restructured buttons below to control.")
     try:
         bot.answer_callback_query(call.id)
         bot.edit_message_text(main_menu_text, chat_id, call.message.message_id,

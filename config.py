@@ -67,21 +67,19 @@ SECURITY_CONFIG = {
     'blocked_imports': ['shutil.rmtree', 'subprocess','os.remove', 'os.unlink']
 }
 
-# Command Button Layouts
+# Command Button Layouts - Rearranged & Anonymized for Public Launch (Fixes Layout & Privacy)
 COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
-    ["📢 Updates Channel"],
-    ["📤 Upload File", "📂 Check Files"],
-    ["⚡ Bot Speed", "📞 Contact Owner"],
-    ["🆘 Help"]
+    ["📤 Upload Script"],
+    ["📂 My Scripts", "⚡ Test Ping"],
+    ["📢 Updates Channel", "🆘 Help Guide"]
 ]
 
 ADMIN_COMMAND_BUTTONS_LAYOUT_USER_SPEC = [
-    ["📢 Updates Channel"],
-    ["📤 Upload File", "📂 Check Files"],
-    ["⚡ Bot Speed", "📊 Statistics"],
+    ["📤 Upload Script"],
+    ["📂 My Scripts", "⚡ Test Ping"],
     ["💳 Subscriptions", "📢 Broadcast"],
     ["🔒 Lock Bot", "👑 Admin Panel"],
-    ["📞 Contact Owner", "📢 Channel Add"],
-    ["👥 User Management", "🛠️ Manual Install"],
-    ["⚙️ Settings"]
+    ["📢 Channel Add", "👥 User Management"],
+    ["🛠️ Admin Install", "⚙️ Settings"],
+    ["📢 Updates Channel", "🆘 Help Guide"]
 ]
