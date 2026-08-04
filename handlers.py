@@ -1131,6 +1131,18 @@ def handle_callbacks(call):
         elif data.startswith('backup_'):
             backup_callback(call)
             return
+        elif data.startswith('edit_menu_'):
+            edit_menu_callback(call)
+            return
+        elif data.startswith('edit_view_'):
+            edit_view_callback(call)
+            return
+        elif data.startswith('edit_over_'):
+            edit_over_callback(call)
+            return
+        elif data.startswith('edit_app_'):
+            edit_app_callback(call)
+            return
         elif data.startswith('file_'): file_control_callback(call)
         elif data.startswith('start_'): start_bot_callback(call)
         elif data.startswith('stop_'): stop_bot_callback(call)
@@ -2901,7 +2913,7 @@ def explorer_callback(call):
         logger.error(f"Error in explorer_callback: {e}", exc_info=True)
 
 def explore_file_callback(call):
-    """Display individual file information"""
+    """Display individual file information with Real-Time Editor integration"""
     bot.answer_callback_query(call.id)
     try:
         data_parts = call.data.split('_', 2)
@@ -2924,6 +2936,11 @@ def explore_file_callback(call):
         mtime = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
         
         markup = types.InlineKeyboardMarkup(row_width=2)
+        # Add Real-Time Viewer and Editor buttons (Fixes File Editor requirement)
+        markup.row(
+            btn("🔍 View Code", callback_data=f"edit_view_{script_owner_id}_{file_name}", style='primary'),
+            btn("✏️ Edit File", callback_data=f"edit_menu_{script_owner_id}_{file_name}", style='success')
+        )
         markup.row(
             btn("🗑️ Delete File", callback_data=f"expdel_{script_owner_id}_{file_name}", style='danger'),
             btn("🔙 Back to Explorer", callback_data=f"explorer_{script_owner_id}", style='primary')
@@ -3003,4 +3020,171 @@ def backup_callback(call):
     except Exception as e:
         logger.error(f"Error in backup_callback: {e}", exc_info=True)
         bot.send_message(call.message.chat.id, "❌ Error generating backup archive.")
+
+
+
+# =====================================================================
+# ✏️ REAL-TIME FILE EDITOR MODULE (IN-BOT IDE INTEGRATION)
+# =====================================================================
+
+def edit_menu_callback(call):
+    """Show Real-Time Editor options menu"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_', 2)
+        script_owner_id = int(data_parts[1])
+        file_name = data_parts[2]
+        requesting_user_id = call.from_user.id
+        
+        if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
+            bot.send_message(call.message.chat.id, "⚠️ Permission denied.")
+            return
+            
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        markup.row(
+            btn("📝 Overwrite Code", callback_data=f"edit_over_{script_owner_id}_{file_name}", style='success'),
+            btn("➕ Append Code", callback_data=f"edit_app_{script_owner_id}_{file_name}", style='primary')
+        )
+        markup.row(
+            btn("🔙 Back to File", callback_data=f"expfile_{script_owner_id}_{file_name}", style='primary')
+        )
+        
+        edit_menu_text = f"✏️ **Real-Time Code Editor**: `{file_name}`\n\nSelect an editing action below:"
+        bot.edit_message_text(edit_menu_text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in edit_menu_callback: {e}", exc_info=True)
+
+def edit_view_callback(call):
+    """Read and display the file contents (handles 4096 character limit safely)"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_', 2)
+        script_owner_id = int(data_parts[1])
+        file_name = data_parts[2]
+        requesting_user_id = call.from_user.id
+        
+        if not (requesting_user_id == script_owner_id or requesting_user_id in admin_ids):
+            bot.send_message(call.message.chat.id, "⚠️ Permission denied.")
+            return
+            
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        
+        if not os.path.exists(file_path):
+            bot.send_message(call.message.chat.id, "❌ File not found.")
+            return
+            
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            code_content = f.read()
+            
+        # Determine language for backtick highlights
+        ext = os.path.splitext(file_name)[1].lower()
+        lang = "python" if ext == ".py" else "javascript" if ext == ".js" else ""
+        
+        max_tg_view = 3500
+        truncated = False
+        if len(code_content) > max_tg_view:
+            code_content = code_content[:max_tg_view]
+            truncated = True
+            
+        markup = types.InlineKeyboardMarkup()
+        markup.add(btn("🔙 Back", callback_data=f"expfile_{script_owner_id}_{file_name}", style='primary'))
+        
+        view_text = f"🔍 **Viewer**: `{file_name}`"
+        if truncated:
+            view_text += " *(Truncated - File too large for direct Telegram view)*"
+            
+        view_text += f"\n\n```{lang}\n{code_content}\n```"
+        if truncated:
+            view_text += "\n⚠️ *Truncated. Please download backup zip to view full code.*"
+            
+        bot.edit_message_text(view_text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"Error in edit_view_callback: {e}", exc_info=True)
+        bot.send_message(call.message.chat.id, "❌ Error loading file content.")
+
+def edit_over_callback(call):
+    """Prompt user to send entire code to overwrite the file"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_', 2)
+        script_owner_id = int(data_parts[1])
+        file_name = data_parts[2]
+        
+        msg = bot.send_message(call.message.chat.id, f"📝 **Overwrite Code**: `{file_name}`\n\nPlease send a text message containing the **complete new code** for this file.\n\n/cancel to abort.", reply_markup=cancel_markup(), parse_mode='Markdown')
+        msg.from_user = call.from_user
+        
+        # Pass script_owner_id and file_name as extra arguments to next step
+        bot.register_next_step_handler(msg, lambda message: process_overwrite_code(message, script_owner_id, file_name))
+    except Exception as e:
+        logger.error(f"Error in edit_over_callback: {e}", exc_info=True)
+
+def process_overwrite_code(message, script_owner_id, file_name):
+    """Process the overwrite content and save to disk"""
+    if message.text and message.text.lower() == '/cancel':
+        bot.reply_to(message, "❌ Editing aborted.")
+        return
+        
+    if not message.text:
+        bot.reply_to(message, "⚠️ Overwrite rejected. Code must be sent as text.")
+        return
+        
+    try:
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        
+        # Save code
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(message.text)
+            
+        markup = types.InlineKeyboardMarkup()
+        markup.add(btn("📂 Back to File", callback_data=f"expfile_{script_owner_id}_{file_name}", style='primary'))
+        
+        bot.reply_to(message, f"✅ **Success**! File `{file_name}` has been successfully updated/overwritten!", reply_markup=markup, parse_mode='Markdown')
+        logger.warning(f"File {file_name} of user {script_owner_id} overwritten via real-time editor.")
+    except Exception as e:
+        logger.error(f"Error in process_overwrite_code: {e}", exc_info=True)
+        bot.reply_to(message, "❌ Failed to save file.")
+
+def edit_app_callback(call):
+    """Prompt user to send code to append"""
+    bot.answer_callback_query(call.id)
+    try:
+        data_parts = call.data.split('_', 2)
+        script_owner_id = int(data_parts[1])
+        file_name = data_parts[2]
+        
+        msg = bot.send_message(call.message.chat.id, f"➕ **Append Code**: `{file_name}`\n\nPlease send the code you want to **append** to the end of this file.\n\n/cancel to abort.", reply_markup=cancel_markup(), parse_mode='Markdown')
+        msg.from_user = call.from_user
+        
+        bot.register_next_step_handler(msg, lambda message: process_append_code(message, script_owner_id, file_name))
+    except Exception as e:
+        logger.error(f"Error in edit_app_callback: {e}", exc_info=True)
+
+def process_append_code(message, script_owner_id, file_name):
+    """Process the appended content and save to disk"""
+    if message.text and message.text.lower() == '/cancel':
+        bot.reply_to(message, "❌ Editing aborted.")
+        return
+        
+    if not message.text:
+        bot.reply_to(message, "⚠️ Append rejected. Code must be sent as text.")
+        return
+        
+    try:
+        user_folder = get_user_folder(script_owner_id)
+        file_path = os.path.join(user_folder, file_name)
+        
+        # Append code with clean line breaks
+        with open(file_path, 'a', encoding='utf-8') as f:
+            f.write("\n\n" + message.text)
+            
+        markup = types.InlineKeyboardMarkup()
+        markup.add(btn("📂 Back to File", callback_data=f"expfile_{script_owner_id}_{file_name}", style='primary'))
+        
+        bot.reply_to(message, f"✅ **Success**! Code successfully appended to `{file_name}`!", reply_markup=markup, parse_mode='Markdown')
+        logger.info(f"File {file_name} of user {script_owner_id} appended via real-time editor.")
+    except Exception as e:
+        logger.error(f"Error in process_append_code: {e}", exc_info=True)
+        bot.reply_to(message, "❌ Failed to append to file.")
 
