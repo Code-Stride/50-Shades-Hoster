@@ -67,6 +67,13 @@ def kb_btn(text, style=None):
         button.style = style
     return button
 
+# Helper to create a single red cancel & back inline button (Fixes /cancel text prompt flow)
+def cancel_markup():
+    markup = types.InlineKeyboardMarkup()
+    markup.add(btn("🔙 Cancel & Back", callback_data="cancel_next_step", style="danger"))
+    return markup
+
+
 
 
 # --- HELPER FUNCTIONS EXTRACTED FROM TEST.PY ---
@@ -192,7 +199,7 @@ def manual_install_module_init(message):
         bot.reply_to(message, "⚠️ Bot locked by admin. Try later.")
         return
     
-    msg = bot.reply_to(message, "📦 Send module name to install (e.g., `requests` or `pillow`)\nFor Node.js: `npm:module_name`\n/cancel to cancel")
+    msg = bot.reply_to(message, "📦 **Module Installation**:\n\nSend module name to install (e.g., `requests` or `pillow`)\nFor Node.js, use format: `npm:module_name`", reply_markup=cancel_markup(), parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_manual_install_module)
 
 
@@ -1084,7 +1091,7 @@ def _logic_admin_install(message):
     if message.from_user.id not in admin_ids:
         bot.reply_to(message, "⚠️ Admin permissions required.")
         return
-    msg = bot.reply_to(message, "🛠️ Admin Module Installation\nSend user ID and module name (e.g., `12345678 requests`)\n/cancel to cancel")
+    msg = bot.reply_to(message, "🛠️ **Admin Module Installation**:\n\nSend User ID and module name (e.g., `12345678 requests`):", reply_markup=cancel_markup(), parse_mode='Markdown')
     bot.register_next_step_handler(msg, process_admin_install)
 
 def process_admin_install(message):
@@ -1345,6 +1352,12 @@ def handle_callbacks(call):
         elif data == 'check_files': check_files_callback(call)
         elif data.startswith('users_page_'): admin_required_callback(call, handle_users_page)
         elif data == 'noop': bot.answer_callback_query(call.id); return
+        elif data == 'cancel_next_step':
+            try: bot.clear_step_handler_by_chat_id(call.message.chat.id)
+            except Exception as e: logger.error(f"Error clearing step handler: {e}")
+            bot.answer_callback_query(call.id, "❌ Action cancelled!")
+            back_to_main_callback(call)
+            return
         elif data.startswith('file_'): file_control_callback(call)
         elif data.startswith('start_'): start_bot_callback(call)
         elif data.startswith('stop_'): stop_bot_callback(call)
@@ -1964,8 +1977,8 @@ def process_broadcast_message(message):
 
     broadcast_content = message.text # Can also handle photos, videos etc. if message.content_type is checked
     if not broadcast_content and not (message.photo or message.video or message.document or message.sticker or message.voice or message.audio): # If no text and no other media
-         bot.reply_to(message, "⚠️ Cannot broadcast empty message. Send text or media, or /cancel.")
-         msg = bot.send_message(message.chat.id, "📢 Send broadcast message or /cancel.")
+         bot.reply_to(message, "⚠️ Cannot broadcast empty message. Send text or media.")
+         msg = bot.send_message(message.chat.id, "📢 Send broadcast message:", reply_markup=cancel_markup())
          bot.register_next_step_handler(msg, process_broadcast_message)
          return
 
@@ -2083,7 +2096,7 @@ def admin_panel_callback(call):
 
 def add_admin_init_callback(call):
     bot.answer_callback_query(call.id)
-    msg = bot.send_message(call.message.chat.id, "👑 Enter User ID to promote to Admin.\n/cancel to abort.")
+    msg = bot.send_message(call.message.chat.id, "👑 **Admin Promotion**:\n\nEnter the numerical User ID of the user you want to promote to Admin.", reply_markup=cancel_markup(), parse_mode='Markdown')
     # Fix from_user so next step handler waits for the actual user (Fixes Add Admin Input bug)
     msg.from_user = call.from_user
     bot.register_next_step_handler(msg, process_add_admin_id)
@@ -2103,8 +2116,8 @@ def process_add_admin_id(message):
         try: bot.send_message(new_admin_id, "🎉 Congrats! You are now an Admin.")
         except Exception as e: logger.error(f"Failed to notify new admin {new_admin_id}: {e}")
     except ValueError:
-        bot.reply_to(message, "⚠️ Invalid ID. Send numerical ID or /cancel.")
-        msg = bot.send_message(message.chat.id, "👑 Enter User ID to promote or /cancel.")
+        bot.reply_to(message, "⚠️ Invalid ID. Please send a valid numerical ID.")
+        msg = bot.send_message(message.chat.id, "👑 Enter User ID to promote:", reply_markup=cancel_markup())
         bot.register_next_step_handler(msg, process_add_admin_id)
     except Exception as e: logger.error(f"Error processing add admin: {e}", exc_info=True); bot.reply_to(message, "Error.")
 
@@ -2468,7 +2481,7 @@ def handle_users_page(call):
 
 def set_user_limit_callback(call):
     bot.answer_callback_query(call.id)
-    msg = bot.send_message(call.message.chat.id, "🔧 Enter User ID and new limit (e.g., `12345678 50`)\n/cancel to cancel")
+    msg = bot.send_message(call.message.chat.id, "🔧 **Set Custom Limit**:\n\nEnter User ID and new limit (e.g., `12345678 50`):", reply_markup=cancel_markup(), parse_mode='Markdown')
     # Fix from_user so next step handler waits for the actual user
     msg.from_user = call.from_user
     bot.register_next_step_handler(msg, process_set_user_limit)
