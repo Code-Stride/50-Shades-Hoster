@@ -64,6 +64,16 @@ DANGEROUS_PATTERNS = [
     r':>\s*',
 
     # ======================
+    # DIRECTORY TRAVERSAL / PATH SANDBOXING
+    # ======================
+    r'\.\.[/\\]',                         # Blocks '../' or '..\\' directory traversal
+    r'\bpathlib\.Path\s*\(.*?\.\..*?\)',  # Blocks Path('..') traversal
+    r'/\.\.',                             # Blocks '/..' path traversal
+    r'\\\.{2}',                           # Blocks '\..' path traversal
+    r'["\']/[a-zA-Z_]',                  # Blocks absolute Unix paths in string literals (e.g. '/etc', '/var') except safe relative single characters
+    r'["\'][a-zA-Z]:[/\\]',              # Blocks absolute Windows drive paths in string literals (e.g. 'C:\', 'D:/')
+
+    # ======================
     # CTYPES / DLL LOADING
     # ======================
     r'\bctypes\b',
