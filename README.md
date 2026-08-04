@@ -75,14 +75,14 @@ Heroku uses our `app.json` and `Procfile`.
    ```
 4. Start the bot:
    ```bash
-   python test.py
+   python main.py
    ```
 
 ---
 
 ## 📂 Codebase Architecture (Modular Breakdown)
 
-- `test.py`: Backwards-compatible startup wrapper.
+- `main.py`: Standalone single-file startup entrypoint.
 - `main.py`: Main entry point that sets up, initializes, and spins up the bot.
 - `config.py`: Environment loader and centralized constant settings.
 - `state.py`: Centralized in-memory shared caches across different threads.
