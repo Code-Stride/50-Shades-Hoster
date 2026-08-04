@@ -13,6 +13,7 @@ A highly optimized, modular, and robust Telegram Bot Hosting Platform built usin
 - 🔒 **Resilient Security Scanning**: Safe, double-checked, and non-redundant scanning of single script files and ZIP archives.
 - 🛡️ **Bypassing Mandatory Lockouts**: Bypasses mandatory sub check if the bot lacks admin permissions in a configured channel—keeping users active and preventing system lockout.
 - 💾 **No Storage Waste**: Deletes temporary ZIP archives once extraction is successfully completed.
+- 🔌 **Web Dashboard & IDE**: A fully featured, highly secure, and gorgeous dark-mode Web Portal. Log in anonymously using your User ID and Hash Key to manage files, upload codes via drag-and-drop, view/edit script logs, and edit code in real-time with an in-browser IDE!
 - 🔌 **Flask Keep-Alive**: Included keep-alive endpoint for cloud platforms to ensure 24/7 uptime.
 
 ---
